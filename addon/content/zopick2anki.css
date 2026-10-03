@@ -25,7 +25,6 @@
   --input-shadow: none;
   --color-green: #2e9e5b;
   --color-orange: #d99000;
-  --font-interface: "Segoe UI", "Microsoft YaHei", system-ui, sans-serif;
   --font-ui-smaller: 11px;
   --font-ui-small: 13px;
   --font-medium: 500;
@@ -76,7 +75,7 @@
   gap: 6px;
   max-height: 260px; /* 由 JS 覆盖为设置项 popupMaxHeight */
   overflow: hidden;
-  font-family: var(--font-interface);
+  font-family: inherit;
   font-size: var(--font-ui-small);
   color: var(--text-normal);
   text-align: left;
@@ -128,7 +127,7 @@
   height: auto;
   overflow: auto;
   font-size: var(--font-ui-small);
-  font-family: var(--font-interface);
+  font-family: inherit;
   color: var(--text-normal);
 }
 
@@ -210,7 +209,7 @@
   color: var(--text-normal);
   cursor: pointer;
   font-size: var(--font-ui-smaller);
-  font-family: var(--font-interface);
+  font-family: inherit;
 }
 
 .p2a-btn-row button:hover {
@@ -392,7 +391,8 @@
 
 /* ======== 设置面板（Zotero 偏好面板，见 addon/content/preferences.xhtml） ======== */
 .zopick2anki-prefs {
-  font-family: var(--font-interface);
+  /* Match Zotero's platform UI font, including its Japanese font fallback. */
+  font-family: inherit;
   color: var(--text-normal);
   font-size: var(--font-ui-small);
 }
@@ -475,7 +475,7 @@
 .zopick2anki-prefs select,
 .zopick2anki-prefs input[type="text"],
 .zopick2anki-prefs textarea {
-  font-family: var(--font-interface);
+  font-family: inherit;
   font-size: var(--font-ui-small);
   padding: 3px 6px;
   border: 1px solid var(--background-modifier-border);
@@ -489,12 +489,12 @@
 .zopick2anki-prefs textarea {
   width: 100%;
   min-height: 70px;
-  font-family: Consolas, "Courier New", monospace;
+  font-family: inherit;
   font-size: var(--font-ui-smaller);
 }
 
 .zopick2anki-prefs button {
-  font-family: var(--font-interface);
+  font-family: inherit;
   font-size: var(--font-ui-smaller);
   padding: 3px 10px;
   border: 1px solid var(--background-modifier-border);
