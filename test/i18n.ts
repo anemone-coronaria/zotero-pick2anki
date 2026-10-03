@@ -110,6 +110,22 @@ const dom = new JSDOM("<!doctype html><html><body><div id='host'></div></body></
 const host = dom.window.document.querySelector("#host") as HTMLElement;
 renderPrefsPane(dom.window.document, host);
 assert.match(host.textContent || "", /Interface language/);
+assert.equal(host.querySelectorAll(".p2a-src-list").length, 1);
+assert.equal(host.querySelectorAll(".p2a-src-list .p2a-src-row").length, 5);
+const firstDictionaryToggle = host.querySelector(".p2a-src-row input[type='checkbox']") as HTMLInputElement;
+firstDictionaryToggle.checked = false;
+firstDictionaryToggle.dispatchEvent(new dom.window.Event("change", { bubbles: true }));
+assert.equal(getSettings().onlineDictSources.length, 4);
+assert.equal(host.querySelectorAll(".p2a-src-list .p2a-src-row").length, 5);
+assert.equal(host.querySelectorAll(".p2a-src-list .p2a-src-row input:not(:checked)").length, 1);
+assert.ok(!(host.textContent || "").includes("Disabled dictionaries"));
+const disabledDictionaryToggle = host.querySelector(
+  ".p2a-src-list .p2a-src-row input:not(:checked)",
+) as HTMLInputElement;
+disabledDictionaryToggle.checked = true;
+disabledDictionaryToggle.dispatchEvent(new dom.window.Event("change", { bubbles: true }));
+assert.equal(getSettings().onlineDictSources.at(-1), "youdao");
+assert.equal(host.querySelector(".p2a-src-list .p2a-src-row:last-child")?.getAttribute("data-src"), "youdao");
 const importBox = Array.from(host.querySelectorAll("textarea")).find((node) => !node.hasAttribute("readonly"));
 assert.ok(importBox);
 importBox.value = "draft settings";

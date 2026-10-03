@@ -32,8 +32,6 @@ export interface Messages {
     introduction: string;
     orderLabel: string;
     orderDescription: string;
-    disabledLabel: string;
-    disabledDescription: string;
     testLabel: string;
     testDescription: string;
     testButton: string;

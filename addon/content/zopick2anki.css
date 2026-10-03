@@ -274,6 +274,10 @@
   cursor: grab;
 }
 
+.p2a-src-grip.p2a-src-grip-disabled {
+  cursor: default;
+}
+
 .p2a-src-name {
   flex: 1;
   font-size: var(--font-ui-small);

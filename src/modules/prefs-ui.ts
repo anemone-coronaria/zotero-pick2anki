@@ -266,63 +266,57 @@ function renderDictSection(doc: Document, host: HTMLElement, s: Pick2ankiSetting
   const disabled = ONLINE_DICT_SOURCES.filter((x) => !active.includes(x));
   let dragId: string | null = null;
 
-  for (const src of active) {
+  for (const src of [...active, ...disabled]) {
+    const isActive = active.includes(src);
     const r = div(doc, "p2a-src-row");
-    r.draggable = true;
+    r.draggable = isActive;
     r.dataset.src = src;
-    r.appendChild(span(doc, "p2a-src-grip", "⠿"));
+    r.appendChild(span(doc, `p2a-src-grip${isActive ? "" : " p2a-src-grip-disabled"}`, "⠿"));
     r.appendChild(span(doc, "p2a-src-name", m.dictionaries.names[src]));
-    r.appendChild(checkbox(doc, true, () => {
-      setSetting("onlineDictSources", (getSettings().onlineDictSources || []).filter((x) => x !== src));
+    r.appendChild(checkbox(doc, isActive, (enabled) => {
+      const current = getSettings().onlineDictSources || [];
+      setSetting("onlineDictSources", enabled
+        ? (current.includes(src) ? current : [...current, src])
+        : current.filter((x) => x !== src));
       rerenderDict();
     }));
 
-    r.addEventListener("dragstart", (e) => {
-      dragId = src;
-      if (e.dataTransfer) { e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", src); }
-      r.classList.add("p2a-src-dragging");
-    });
-    r.addEventListener("dragend", () => {
-      dragId = null;
-      r.classList.remove("p2a-src-dragging");
-      for (const other of Array.from(list.querySelectorAll(".p2a-src-row"))) other.classList.remove("p2a-src-drag-over");
-    });
-    r.addEventListener("dragover", (e) => {
-      if (!dragId || dragId === (r.dataset.src || "")) return;
-      e.preventDefault();
-      r.classList.add("p2a-src-drag-over");
-    });
-    r.addEventListener("dragleave", () => r.classList.remove("p2a-src-drag-over"));
-    r.addEventListener("drop", (e) => {
-      e.preventDefault();
-      r.classList.remove("p2a-src-drag-over");
-      const from = dragId;
-      const to = r.dataset.src || "";
-      if (!from || from === to) return;
-      const list2 = [...(getSettings().onlineDictSources || [])];
-      const fi = list2.indexOf(from as OnlineDictSource);
-      const ti = list2.indexOf(to as OnlineDictSource);
-      if (fi >= 0 && ti >= 0 && fi !== ti) {
-        list2.splice(ti, 0, list2.splice(fi, 1)[0]);
-        setSetting("onlineDictSources", list2);
-        rerenderDict();
-      }
-    });
+    if (isActive) {
+      r.addEventListener("dragstart", (e) => {
+        dragId = src;
+        if (e.dataTransfer) { e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", src); }
+        r.classList.add("p2a-src-dragging");
+      });
+      r.addEventListener("dragend", () => {
+        dragId = null;
+        r.classList.remove("p2a-src-dragging");
+        for (const other of Array.from(list.querySelectorAll(".p2a-src-row"))) other.classList.remove("p2a-src-drag-over");
+      });
+      r.addEventListener("dragover", (e) => {
+        if (!dragId || dragId === (r.dataset.src || "")) return;
+        e.preventDefault();
+        r.classList.add("p2a-src-drag-over");
+      });
+      r.addEventListener("dragleave", () => r.classList.remove("p2a-src-drag-over"));
+      r.addEventListener("drop", (e) => {
+        e.preventDefault();
+        r.classList.remove("p2a-src-drag-over");
+        const from = dragId;
+        const to = r.dataset.src || "";
+        if (!from || from === to) return;
+        const list2 = [...(getSettings().onlineDictSources || [])];
+        const fi = list2.indexOf(from as OnlineDictSource);
+        const ti = list2.indexOf(to as OnlineDictSource);
+        if (fi >= 0 && ti >= 0 && fi !== ti) {
+          list2.splice(ti, 0, list2.splice(fi, 1)[0]);
+          setSetting("onlineDictSources", list2);
+          rerenderDict();
+        }
+      });
+    }
     list.appendChild(r);
   }
   body.appendChild(list);
-
-  if (disabled.length > 0) {
-    addRow(host, m.dictionaries.disabledLabel, m.dictionaries.disabledDescription);
-    for (const src of disabled) {
-      const b2 = addRow(host, m.dictionaries.names[src]);
-      b2.appendChild(checkbox(doc, false, (v) => {
-        if (!v) return;
-        setSetting("onlineDictSources", [...(getSettings().onlineDictSources || []), src]);
-        rerenderDict();
-      }));
-    }
-  }
 
   const testBody = addRow(host, m.dictionaries.testLabel, m.dictionaries.testDescription);
   const testOut = div(doc, "zp-status");
