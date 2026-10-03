@@ -338,9 +338,9 @@ async function main(): Promise<void> {
     !!panel.querySelector(".p2a-section-hdr") && !!panel.querySelector(".p2a-text")
     && !!panel.querySelector(".p2a-btn-row") && !!panel.querySelector(".p2a-msg"));
   check("标题行显示选中词", panel.querySelector(".p2a-section-hdr")?.textContent?.includes("hello") === true);
-  check("Ctrl 模式下显示「查词」按钮且不自动联网",
+  check("Manual mode shows the Look up button without starting a request",
     !!panel.querySelector(".p2a-btn-row button")
-    && (panel.querySelector(".p2a-text")?.textContent || "").includes("点击「🔍 查词」"));
+    && (panel.querySelector(".p2a-text")?.textContent || "").includes("Choose Look up"));
   check("启用写卡时显示 ➕ Anki 按钮",
     Array.from(panel.querySelectorAll(".p2a-btn-row button")).some((b) => (b.textContent || "").includes("Anki")));
   const maxH = Number((panel.style.maxHeight || "0").replace("px", ""));
@@ -563,7 +563,7 @@ async function main(): Promise<void> {
       check("划词事件产出了面板且已挂到文档上", !!panel3 && panel3.isConnected);
       const dictReady = await waitFor(() => {
         const t = panel3?.querySelector(".p2a-text")?.textContent || "";
-        return t.length > 0 && !t.includes("查询中");
+        return t.length > 0 && !t.includes("Looking up");
       }, 40000);
       check("划词弹窗自动查词完成（端到端前提）", dictReady);
       const addBtn = panel3?.querySelector(".p2a-btn-row button") as HTMLButtonElement | null;

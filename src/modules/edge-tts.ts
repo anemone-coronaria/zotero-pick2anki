@@ -11,6 +11,7 @@
 //   4) window.setTimeout → env.setTimer（沙箱里没有全局 window）
 import { clearTimer, getWebSocketCtor, randomHex, randomHexUpper, setTimer } from "./env";
 import { sha256Hex } from "./sha256";
+import { getMessages } from "../i18n";
 
 const TRUSTED_CLIENT_TOKEN = "6A5AA1D4EAFF4E9FB37E23D68491D6F4";
 const CHROMIUM_FULL_VERSION = "143.0.3650.75";
@@ -138,15 +139,16 @@ async function toBytes(data: unknown): Promise<Uint8Array | null> {
  */
 export function edgeSynth(text: string, voice: string, rate: number, pitch: number, timeoutMs = 20000): Promise<Uint8Array> {
   return new Promise((resolve, reject) => {
+    const messages = getMessages();
     const WS = getWebSocketCtor();
-    if (!WS) { reject(new Error("当前环境不支持 WebSocket，无法使用 Edge TTS 发音")); return; }
+    if (!WS) { reject(new Error(messages.errors.websocketUnavailable)); return; }
 
     const chunks: Uint8Array[] = [];
     let settled = false;
     let queue: Promise<void> = Promise.resolve(); // 保证二进制帧按顺序入队
     const ws = new WS(buildUrl());
     const timer = setTimer(() => {
-      if (!settled) { settled = true; try { ws.close(); } catch { /* Expected */ } reject(new Error("多语言语音超时")); }
+      if (!settled) { settled = true; try { ws.close(); } catch { /* Expected */ } reject(new Error(messages.errors.speechTimeout)); }
     }, timeoutMs);
 
     const finish = (ok: boolean, err?: string) => {
@@ -161,7 +163,7 @@ export function edgeSynth(text: string, voice: string, rate: number, pitch: numb
         for (const c of chunks) { out.set(c, off); off += c.length; }
         resolve(out);
       } else {
-        reject(new Error(err || "多语言语音无音频返回"));
+        reject(new Error(err || messages.errors.speechNoAudio));
       }
     };
 
@@ -171,7 +173,7 @@ export function edgeSynth(text: string, voice: string, rate: number, pitch: numb
         ws.send(configMsg());
         ws.send(ssmlMsg(text, voice, rate, pitch));
       } catch (e) {
-        finish(false, `多语言语音发送失败: ${e instanceof Error ? e.message : String(e)}`);
+        finish(false, messages.errors.speechSendFailed(e instanceof Error ? e.message : String(e)));
       }
     };
     ws.onmessage = (ev: { data?: unknown }) => {
@@ -193,9 +195,9 @@ export function edgeSynth(text: string, voice: string, rate: number, pitch: numb
       }).catch(() => { /* 单帧解析失败忽略 */ });
     };
     ws.onerror = (e: unknown) => {
-      const msg = (e as { message?: string })?.message || "未知错误";
-      finish(false, `多语言语音连接失败: ${msg}`);
+      const msg = (e as { message?: string })?.message || "Unknown error";
+      finish(false, messages.errors.speechConnectionFailed(msg));
     };
-    ws.onclose = (ev: { code?: number }) => { if (chunks.length === 0) finish(false, `多语言语音连接关闭 (${ev?.code ?? 0})`); };
+    ws.onclose = (ev: { code?: number }) => { if (chunks.length === 0) finish(false, messages.errors.speechClosed(ev?.code ?? 0)); };
   });
 }

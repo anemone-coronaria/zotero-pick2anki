@@ -50,6 +50,7 @@ export interface DictLookupSource {
   url: string;
   ok: boolean;
   result?: DictResult | null;
+  errorCode?: "unknown_source" | "no_entry" | "lookup_failed";
   error?: string;
 }
 

@@ -4,6 +4,8 @@
 // 自动加上包前缀，最终落到 extensions.zotero.zoteropick2anki.<key>。
 // 数组/对象类型用 JSON 字符串存放（Zotero 偏好只支持 bool / int / string）。
 pref("triggerMode", "direct");          // direct | ctrl
+pref("uiLanguage", "en");              // en | ja | zh-Hans | system
+pref("cardLabelLanguage", "ui");       // ui | en | ja | zh-Hans
 pref("triggerDebounce", 500);           // 保留位：与 Obsidian 版 schema 对齐
 pref("onlineDictSources", "[\"youdao\",\"bing\",\"cambridge\",\"collins\",\"oxford\"]");
 pref("ankiEnabled", false);

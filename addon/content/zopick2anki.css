@@ -422,6 +422,8 @@
   gap: 4px;
   margin: 14px 0;
   max-width: 720px;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .zopick2anki-prefs .zp-row > label.zp-name {
@@ -437,6 +439,26 @@
   align-items: flex-start;
   gap: 4px;
   min-width: 0;
+}
+
+.zopick2anki-prefs .zp-name,
+.zopick2anki-prefs .zp-desc,
+.zopick2anki-prefs .zp-field-row,
+.zopick2anki-prefs .zp-fm-label,
+.zopick2anki-prefs .zp-fm-desc {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.zopick2anki-prefs button,
+.zopick2anki-prefs select,
+.zop2a-popup button {
+  white-space: normal;
+}
+
+.zopick2anki-prefs,
+.zop2a-popup {
+  line-height: 1.5;
 }
 
 /* 说明排在控件之后（视觉顺序：名称 → 控件 → 说明） */

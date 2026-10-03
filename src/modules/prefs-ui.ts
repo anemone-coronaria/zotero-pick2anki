@@ -13,18 +13,20 @@
 //   3) 所有异步回调都包了 try/catch，异常只显示在状态行里，不会冒泡到偏好窗口。
 import type { AnkiFieldSource, OnlineDictSource, Pick2ankiSettings } from "./settings";
 import {
-  ANKI_FIELD_SOURCES, ANKI_SOURCE_LABELS, ANKI_SOURCE_PLACEHOLDERS,
-  ONLINE_DICT_NAMES, ONLINE_DICT_SOURCES,
+  ANKI_FIELD_SOURCES, ONLINE_DICT_SOURCES,
 } from "./settings";
 import {
   exportSettingsJson, getSettings, importSettingsJson, resetSettings, setSetting,
 } from "./settings-store";
-import { dictHasContent, lookupWordOnline } from "./online-dict";
+import { dictHasContent, dictSourceErrorText, lookupWordOnline } from "./online-dict";
+import type { DictLookupBundle } from "./online-dict";
 import {
   addWordCard, ankiVersion, fetchAnkiDecks, fetchAnkiModelFields, fetchAnkiModels,
 } from "./anki";
 import { div, el, empty, span } from "./zdom";
 import { log } from "./env";
+import { formatList, getMessages, LOCALE_NATIVE_NAMES } from "../i18n";
+import type { CardLabelLanguage, LanguagePreference, Messages } from "../i18n";
 
 /** 端到端自测用的词。
  *  首选「hippopotomonstrosesquippedaliophobia」（长词恐惧症，34 个字母）：既走通完整链路，
@@ -34,19 +36,6 @@ import { log } from "./env";
 const SELF_TEST_WORD = "hippopotomonstrosesquippedaliophobia";
 /** 超长词查不到时用于完成自测的常用词 */
 const FALLBACK_TEST_WORD = "hello";
-
-/** 固定内容源在设置页的补充说明（与 Obsidian 版 ANKI_SOURCE_DESC 一致） */
-const ANKI_SOURCE_DESC: Record<AnkiFieldSource, string> = {
-  word: "填入的内容：所查的单词/词组",
-  context: "PDF/EPUB 中选中该词的句子（原句即选中文本；开启“原句扩写”后会尽量取完整句子）+ 文献条目信息",
-  phonetic: "英/美 IPA 发音音标",
-  def_single: "首个简明释义，并内嵌该释义自己的例句",
-  def_all: "启用词典的完整释义列表，每条释义均内嵌它自己的例句",
-  examples: "例句已内嵌在释义下方，通常无需单独映射；若想单独汇总一栏例句可在此选择字段",
-  extra: "词形变化 / 常用搭配 / 考试范围标签",
-  audio: "自动获取发音并导入 Anki 媒体库（词典发音优先，HTTP 兜底；Edge TTS 默认关闭）",
-  source: "各词典的网页链接 + 文献条目的 zotero:// 链接 + 条目信息（作者/年份）",
-};
 
 /** 面板运行时状态（Anki 元数据缓存，与 Obsidian 版插件实例上的缓存等价） */
 interface PaneState {
@@ -66,10 +55,16 @@ const state: PaneState = {
 // 面板 DOM 引用（分区容器常驻，异步操作后只重建对应分区）
 let paneDoc: Document | null = null;
 let topStatus: HTMLElement | null = null;
+let languageHost: HTMLElement | null = null;
 let dictHost: HTMLElement | null = null;
 let ankiHost: HTMLElement | null = null;
 let triggerHost: HTMLElement | null = null;
 let migrationHost: HTMLElement | null = null;
+let importDraft = "";
+
+function messages(settings = getSettings()): Messages {
+  return getMessages(settings.uiLanguage);
+}
 
 /** 渲染设置面板（幂等：首次建立骨架与分区容器，之后只重建各分区内容） */
 export function renderPrefsPane(doc: Document, host: HTMLElement): void {
@@ -78,15 +73,17 @@ export function renderPrefsPane(doc: Document, host: HTMLElement): void {
 
   if (!host.querySelector(".zp-skeleton")) {
     empty(host);
-    host.appendChild(heading(doc, "Pick2anki - 设置"));
+    host.appendChild(heading(doc, "Pick2anki"));
     topStatus = div(doc, "zp-status zp-top");
     host.appendChild(topStatus);
     const sk = div(doc, "zp-skeleton");
     host.appendChild(sk);
+    languageHost = div(doc, "zp-section");
     dictHost = div(doc, "zp-section");
     ankiHost = div(doc, "zp-section");
     triggerHost = div(doc, "zp-section");
     migrationHost = div(doc, "zp-section");
+    sk.appendChild(languageHost);
     sk.appendChild(dictHost);
     sk.appendChild(ankiHost);
     sk.appendChild(triggerHost);
@@ -96,10 +93,17 @@ export function renderPrefsPane(doc: Document, host: HTMLElement): void {
 }
 
 function rerenderAll(): void {
+  rerenderLanguage();
   rerenderDict();
   rerenderAnki();
   rerenderTrigger();
   rerenderMigration();
+}
+
+function rerenderLanguage(): void {
+  if (!paneDoc || !languageHost) return;
+  empty(languageHost);
+  renderLanguageSection(paneDoc, languageHost, getSettings());
 }
 
 /** 只重建词典分区（拖拽排序/启停后调用） */
@@ -107,7 +111,7 @@ function rerenderDict(): void {
   if (!paneDoc || !dictHost) return;
   empty(dictHost);
   try { renderDictSection(paneDoc, dictHost, getSettings()); }
-  catch (e) { setStatus("词典分区渲染失败：" + errText(e), false); }
+  catch (e) { setStatus(messages().common.operationFailed(errText(e)), false); }
 }
 
 /** 只重建 Anki 分区（连接/切模板后调用） */
@@ -115,7 +119,7 @@ function rerenderAnki(): void {
   if (!paneDoc || !ankiHost) return;
   empty(ankiHost);
   try { renderAnkiSection(paneDoc, ankiHost, getSettings()); }
-  catch (e) { setStatus("Anki 分区渲染失败：" + errText(e), false); }
+  catch (e) { setStatus(messages().common.operationFailed(errText(e)), false); }
 }
 
 function rerenderTrigger(): void {
@@ -136,7 +140,7 @@ function errText(e: unknown): string {
 
 /** 面板顶部状态行（替代系统进度窗口：不弹浮窗、不抢焦点） */
 function setStatus(text: string, ok?: boolean): void {
-  log("[设置面板] " + text);
+  log("[settings] " + text);
   if (!topStatus) return;
   topStatus.textContent = text;
   topStatus.className = "zp-status zp-top" + (ok === undefined ? "" : ok ? " zp-ok" : " zp-err");
@@ -158,7 +162,7 @@ function row(doc: Document, name: string, desc?: string): HTMLElement {
 
 function addRow(host: HTMLElement, name: string, desc?: string): HTMLElement {
   const doc = paneDoc ?? host.ownerDocument;
-  if (!doc) throw new Error("设置面板缺少 document");
+  if (!doc) throw new Error("The settings panel document is unavailable.");
   const r = row(doc, name, desc);
   host.appendChild(r);
   return r.querySelector(".zp-body") as HTMLElement;
@@ -185,7 +189,7 @@ function button(doc: Document, text: string, onClick: () => void, primary = fals
   const b = el(doc, "button", { cls: primary ? "zp-primary" : undefined, text });
   b.addEventListener("click", () => {
     // 所有按钮回调统一兜底，异常只写进状态行
-    try { onClick(); } catch (e) { setStatus("操作失败：" + errText(e), false); }
+    try { onClick(); } catch (e) { setStatus(messages().common.operationFailed(errText(e)), false); }
   });
   return b;
 }
@@ -200,14 +204,15 @@ function asyncButton(
   const b = el(doc, "button", { cls: primary ? "zp-primary" : undefined, text });
   b.addEventListener("click", () => {
     if (b.disabled) return;
+    const operationMessages = messages();
     b.disabled = true;
     const original = b.textContent;
-    b.textContent = "处理中…";
+    b.textContent = operationMessages.common.processing;
     void (async () => {
       try {
         await run();
       } catch (e) {
-        setStatus("操作失败：" + errText(e), false);
+        setStatus(operationMessages.common.operationFailed(errText(e)), false);
       } finally {
         b.disabled = false;
         b.textContent = original;
@@ -224,13 +229,38 @@ function textInput(doc: Document, value: string, placeholder: string, onChange: 
   return input;
 }
 
+// ---------- Interface language ----------
+function renderLanguageSection(doc: Document, host: HTMLElement, s: Pick2ankiSettings): void {
+  const m = getMessages(s.uiLanguage);
+  const body = addRow(host, m.language.label, m.language.description);
+  body.appendChild(select(doc, [
+    ["en", LOCALE_NATIVE_NAMES.en],
+    ["ja", LOCALE_NATIVE_NAMES.ja],
+    ["zh-Hans", LOCALE_NATIVE_NAMES["zh-Hans"]],
+    ["system", m.language.system],
+  ], s.uiLanguage, (value) => {
+    setSetting("uiLanguage", value as LanguagePreference);
+    rerenderAll();
+  }));
+
+  const cardBody = addRow(host, m.language.cardLabel, m.language.cardLabelDescription);
+  cardBody.appendChild(select(doc, [
+    ["ui", m.language.followInterface],
+    ["en", LOCALE_NATIVE_NAMES.en],
+    ["ja", LOCALE_NATIVE_NAMES.ja],
+    ["zh-Hans", LOCALE_NATIVE_NAMES["zh-Hans"]],
+  ], s.cardLabelLanguage, (value) => {
+    setSetting("cardLabelLanguage", value as CardLabelLanguage);
+  }));
+}
+
 // ---------- 1. 在线词典 ----------
 function renderDictSection(doc: Document, host: HTMLElement, s: Pick2ankiSettings): void {
-  host.appendChild(heading(doc, "📖 在线词典查词"));
-  addRow(host, "说明", "在 Zotero 内置 PDF / EPub 阅读器里划选英文单词或短语，划词弹窗中即出现聚合释义。"
-    + "部分官网受反爬影响失败时会自动跳过该源；弹窗只完整展示“排序最前且可用”的两个源的释义。");
+  const m = getMessages(s.uiLanguage);
+  host.appendChild(heading(doc, m.dictionaries.sectionTitle));
+  addRow(host, m.dictionaries.introductionLabel, m.dictionaries.introduction);
 
-  const body = addRow(host, "顺序与启用", "直接拖动整行调整顺序（越靠上越优先，单一/全部释义与发音按此合并）；行尾开关可停用该源");
+  const body = addRow(host, m.dictionaries.orderLabel, m.dictionaries.orderDescription);
   const list = div(doc, "p2a-src-list");
   const active: OnlineDictSource[] = [...(s.onlineDictSources || [])];
   const disabled = ONLINE_DICT_SOURCES.filter((x) => !active.includes(x));
@@ -241,7 +271,7 @@ function renderDictSection(doc: Document, host: HTMLElement, s: Pick2ankiSetting
     r.draggable = true;
     r.dataset.src = src;
     r.appendChild(span(doc, "p2a-src-grip", "⠿"));
-    r.appendChild(span(doc, "p2a-src-name", ONLINE_DICT_NAMES[src]));
+    r.appendChild(span(doc, "p2a-src-name", m.dictionaries.names[src]));
     r.appendChild(checkbox(doc, true, () => {
       setSetting("onlineDictSources", (getSettings().onlineDictSources || []).filter((x) => x !== src));
       rerenderDict();
@@ -283,9 +313,9 @@ function renderDictSection(doc: Document, host: HTMLElement, s: Pick2ankiSetting
   body.appendChild(list);
 
   if (disabled.length > 0) {
-    addRow(host, "已停用词典", "重新启用会追加到列表末尾");
+    addRow(host, m.dictionaries.disabledLabel, m.dictionaries.disabledDescription);
     for (const src of disabled) {
-      const b2 = addRow(host, ONLINE_DICT_NAMES[src]);
+      const b2 = addRow(host, m.dictionaries.names[src]);
       b2.appendChild(checkbox(doc, false, (v) => {
         if (!v) return;
         setSetting("onlineDictSources", [...(getSettings().onlineDictSources || []), src]);
@@ -294,25 +324,28 @@ function renderDictSection(doc: Document, host: HTMLElement, s: Pick2ankiSetting
     }
   }
 
-  const testBody = addRow(host, "连通性自测", "用 hello 联网试查一次各词典源，确认网络可用（结果直接显示在下方，不打扰你的窗口）");
+  const testBody = addRow(host, m.dictionaries.testLabel, m.dictionaries.testDescription);
   const testOut = div(doc, "zp-status");
-  testBody.appendChild(asyncButton(doc, "试查 hello", async () => {
-    setStatus("正在试查各词典源…");
+  testBody.appendChild(asyncButton(doc, m.dictionaries.testButton, async () => {
+    const operationMessages = messages();
+    setStatus(operationMessages.dictionaries.testing);
     const bundle = await lookupWordOnline("hello", getSettings().onlineDictSources);
-    const lines = bundle.sources.map((x) => `${x.name}：${x.ok ? "✅" : "❌ " + (x.error || "无结果")}`);
+    const lines = bundle.sources.map((x) => operationMessages.dictionaries.sourceResult(
+      operationMessages.dictionaries.names[x.id], x.ok, dictSourceErrorText(x, operationMessages),
+    ));
     testOut.textContent = lines.join("\n");
     testOut.className = "zp-status " + (dictHasContent(bundle) ? "zp-ok" : "zp-err");
-    setStatus(dictHasContent(bundle) ? "词典连通性测试完成" : "词典源全部失败，请检查网络", dictHasContent(bundle));
+    setStatus(dictHasContent(bundle) ? operationMessages.dictionaries.testComplete : operationMessages.dictionaries.testFailed, dictHasContent(bundle));
   }));
   testBody.appendChild(testOut);
 }
 
 // ---------- 2. Anki 写卡 ----------
 function renderAnkiSection(doc: Document, host: HTMLElement, s: Pick2ankiSettings): void {
-  host.appendChild(heading(doc, "🗂 写入 Anki 单词卡"));
+  const m = getMessages(s.uiLanguage);
+  host.appendChild(heading(doc, m.anki.sectionTitle));
 
-  const enableBody = addRow(host, "启用 Anki 写卡", "需要 Anki 桌面版并启用 AnkiConnect 插件（Anki → 工具 → 插件，默认端口 8765）。"
-    + "启用后划词弹窗出现 ➕ Anki 按钮");
+  const enableBody = addRow(host, m.anki.enabledLabel, m.anki.enabledDescription);
   enableBody.appendChild(checkbox(doc, s.ankiEnabled, (v) => {
     setSetting("ankiEnabled", v);
     rerenderAnki();
@@ -320,20 +353,21 @@ function renderAnkiSection(doc: Document, host: HTMLElement, s: Pick2ankiSetting
 
   if (!s.ankiEnabled) return;
 
-  const urlBody = addRow(host, "本地桥接地址", "一般无需修改");
+  const urlBody = addRow(host, m.anki.urlLabel, m.anki.urlDescription);
   urlBody.appendChild(textInput(doc, s.ankiConnectUrl, "http://127.0.0.1:8765", (v) => {
     setSetting("ankiConnectUrl", v.trim() || "http://127.0.0.1:8765");
     state.metaUrl = "";
   }));
 
-  const connBody = addRow(host, "牌组 / 模板", state.decks.length > 0
-    ? `已连接：${state.decks.length} 个牌组、${state.models.length} 个模板`
-    : "点击右侧按钮测试连接并读取牌组/模板列表");
-  connBody.appendChild(asyncButton(doc, "测试连接并读取", async () => {
-    setStatus("正在连接 Anki…");
+  const connBody = addRow(host, m.anki.metadataLabel, state.decks.length > 0
+    ? m.anki.metadataConnected(state.decks.length, state.models.length)
+    : m.anki.metadataDisconnected);
+  connBody.appendChild(asyncButton(doc, m.anki.connectButton, async () => {
+    const operationMessages = messages();
+    setStatus(operationMessages.anki.connecting);
     await refreshAnkiMeta(true);
     if (state.error) {
-      setStatus("连接失败：" + state.error, false);
+      setStatus(operationMessages.anki.connectionFailed(state.error), false);
     } else {
       const cur = getSettings();
       if (!cur.ankiDeck && state.decks.length > 0) setSetting("ankiDeck", state.decks[0]);
@@ -341,162 +375,168 @@ function renderAnkiSection(doc: Document, host: HTMLElement, s: Pick2ankiSetting
         setSetting("ankiNoteType", state.models[0]);
         await loadTemplateFields(state.models[0]);
       }
-      setStatus(`✅ 已连接 Anki，读取到 ${state.decks.length} 个牌组、${state.models.length} 个模板`, true);
+      setStatus(operationMessages.anki.connected(state.decks.length, state.models.length), true);
     }
     rerenderAnki(); // 只重建 Anki 分区（不动偏好窗口的其他部分）
   }, true));
-  if (state.error) addRow(host, "连接状态", "⚠️ " + state.error);
+  if (state.error) addRow(host, m.anki.connectionStatus, "⚠️ " + state.error);
 
   // 目标牌组
   if (state.decks.length > 0) {
     const chosen = s.ankiDeck && state.decks.includes(s.ankiDeck) ? s.ankiDeck : state.decks[0];
-    const b = addRow(host, "目标牌组", "写入的牌组，子牌组用 :: 分隔（如 英语::核心词汇）。列表中没有的请先在 Anki 中创建");
+    const b = addRow(host, m.anki.deckLabel, m.anki.deckDescription);
     b.appendChild(select(doc, state.decks.map((d) => [d, d] as [string, string]), chosen, (v) => {
       setSetting("ankiDeck", v);
     }));
   } else {
-    addRow(host, "目标牌组", "请先点击上方“测试连接并读取”");
+    addRow(host, m.anki.deckLabel, m.anki.deckUnavailable);
   }
 
   // 目标模板
   let chosenModel = "";
   if (state.models.length > 0) {
     chosenModel = s.ankiNoteType && state.models.includes(s.ankiNoteType) ? s.ankiNoteType : state.models[0];
-    const b = addRow(host, "目标模板", "Anki 中的笔记类型；切换后会读取该模板的字段用于下拉选择");
+    const b = addRow(host, m.anki.modelLabel, m.anki.modelDescription);
     b.appendChild(select(doc, state.models.map((m) => [m, m] as [string, string]), chosenModel, (v) => {
       void (async () => {
+        const operationMessages = messages();
         try {
           setSetting("ankiNoteType", v);
-          setStatus("正在读取模板字段…");
+          setStatus(operationMessages.anki.loadingFields);
           await loadTemplateFields(v);
-          if (state.error) setStatus("读取模板字段失败：" + state.error, false);
-          else setStatus(`模板「${v}」共 ${state.fields.length} 个字段`, true);
+          if (state.error) setStatus(operationMessages.anki.fieldsFailed(state.error), false);
+          else setStatus(operationMessages.anki.fieldsLoaded(v, state.fields.length), true);
         } catch (e) {
-          setStatus("切换模板失败：" + errText(e), false);
+          setStatus(operationMessages.anki.modelChangedFailed(errText(e)), false);
         } finally {
           rerenderAnki();
         }
       })();
     }));
-    const fb = addRow(host, "读取模板字段", "随模板选择自动读取；此按钮可手动刷新。下方每个“内容”用下拉单选一个模板字段；留空 = 不写入");
-    fb.appendChild(asyncButton(doc, "读取 / 刷新字段", async () => {
-      const m = getSettings().ankiNoteType || chosenModel;
-      if (!m) { setStatus("请先选择目标模板", false); return; }
-      setStatus("正在读取模板字段…");
+    const fb = addRow(host, m.anki.refreshFieldsLabel, m.anki.refreshFieldsDescription);
+    fb.appendChild(asyncButton(doc, m.anki.refreshFieldsButton, async () => {
+      const operationSettings = getSettings();
+      const operationMessages = getMessages(operationSettings.uiLanguage);
+      const m = operationSettings.ankiNoteType || chosenModel;
+      if (!m) { setStatus(operationMessages.anki.chooseModelFirst, false); return; }
+      setStatus(operationMessages.anki.loadingFields);
       await loadTemplateFields(m);
-      if (state.error) setStatus("读取模板字段失败：" + state.error, false);
-      else setStatus(`模板「${m}」共 ${state.fields.length} 个字段：${state.fields.join("、")}`, true);
+      if (state.error) setStatus(operationMessages.anki.fieldsFailed(state.error), false);
+      else setStatus(operationMessages.anki.fieldsLoaded(
+        m, state.fields.length, formatList(state.fields, operationSettings.uiLanguage),
+      ), true);
       rerenderAnki();
     }));
   } else {
-    addRow(host, "目标模板", "请先点击上方“测试连接并读取”");
+    addRow(host, m.anki.modelLabel, m.anki.modelUnavailable);
   }
 
   // 自动读取当前目标模板的字段（与 Obsidian 版一样只在缓存不匹配时触发一次）
   const model = s.ankiNoteType && state.models.includes(s.ankiNoteType) ? s.ankiNoteType : (state.models[0] || "");
   if (model && state.fieldsModel !== model && !state.busy) {
+    const operationMessages = m;
     state.busy = true;
     void loadTemplateFields(model)
       .then(() => { state.busy = false; rerenderAnki(); })
-      .catch((e) => { state.busy = false; setStatus("自动读取字段失败：" + errText(e), false); });
+      .catch((e) => { state.busy = false; setStatus(operationMessages.anki.autoFieldsFailed(errText(e)), false); });
   }
 
   // 字段映射
-  host.appendChild(heading(doc, "模板字段映射（固定）"));
+  host.appendChild(heading(doc, m.anki.fieldMappingTitle));
   const fieldsLoaded = model !== "" && state.fieldsModel === model;
-  addRow(host, "映射方式", fieldsLoaded
-    ? `已读取模板「${state.fieldsModel}」的字段，每个内容从下拉单选。同一字段可被多个内容共用，写卡时自动合并为多行（一般不推荐）`
-    : "请先在上方选择目标模板并读取字段，再为每个“内容”选择要写入的模板字段");
+  addRow(host, m.anki.mappingMethodLabel, fieldsLoaded
+    ? m.anki.mappingReady(state.fieldsModel)
+    : m.anki.mappingUnavailable);
 
   if (state.fields.length > 0) {
     const grid = div(doc, "zp-field-map");
     for (const src of ANKI_FIELD_SOURCES) {
       // 上下堆叠：内容源名称 → 字段下拉 → 说明（与其它设置项同一套版式）
       const fieldRow = div(doc, "zp-field-row");
-      fieldRow.appendChild(div(doc, "zp-fm-label", ANKI_SOURCE_LABELS[src]));
+      fieldRow.appendChild(div(doc, "zp-fm-label", m.fields.labels[src]));
       const cur = (s.ankiFieldMap?.[src] || "").trim();
-      const options: Array<[string, string]> = [["", "（不填）"], ...state.fields.map((f) => [f, f] as [string, string])];
-      if (cur && !state.fields.includes(cur)) options.push([cur, cur + "（当前模板无此字段）"]);
+      const options: Array<[string, string]> = [["", m.common.doNotInclude], ...state.fields.map((f) => [f, f] as [string, string])];
+      if (cur && !state.fields.includes(cur)) options.push([cur, `${cur} (${m.common.currentFieldMissing})`]);
       fieldRow.appendChild(select(doc, options, cur, (v) => {
         const map = { ...(getSettings().ankiFieldMap || {}) };
         map[src] = v.trim();
         setSetting("ankiFieldMap", map);
-        setStatus(`${ANKI_SOURCE_LABELS[src]} → ${v || "（不写入）"}`, true);
+        setStatus(m.anki.fieldStatus(m.fields.labels[src], v), true);
       }));
-      fieldRow.appendChild(div(doc, "zp-fm-desc", ANKI_SOURCE_DESC[src] + "　（占位示例：" + ANKI_SOURCE_PLACEHOLDERS[src] + "）"));
+      fieldRow.appendChild(div(doc, "zp-fm-desc", `${m.fields.descriptions[src]} (${m.fields.placeholders[src]})`));
       grid.appendChild(fieldRow);
     }
     host.appendChild(grid);
   } else {
-    addRow(host, "当前模板字段", "暂无可用字段（请先点击上方“读取 / 刷新字段”）");
+    addRow(host, m.anki.currentFieldsLabel, m.anki.currentFieldsUnavailable);
   }
 
   // 写卡行为
-  const autoBody = addRow(host, "查词后自动写卡", "开启后，单词查询一完成即自动写入卡片（重复按下方策略处理）；不开启时用弹窗 ➕ Anki 按钮手动添加");
+  const autoBody = addRow(host, m.anki.autoAddLabel, m.anki.autoAddDescription);
   autoBody.appendChild(checkbox(doc, s.ankiAutoAdd, (v) => setSetting("ankiAutoAdd", v)));
 
-  const dupBody = addRow(host, "重复卡片处理");
-  dupBody.appendChild(select(doc, [["skip", "跳过（不重复添加）"], ["add", "仍然添加（允许重复）"]], s.ankiDup, (v) => {
+  const dupBody = addRow(host, m.anki.duplicateLabel);
+  dupBody.appendChild(select(doc, [["skip", m.anki.duplicateSkip], ["add", m.anki.duplicateAdd]], s.ankiDup, (v) => {
     setSetting("ankiDup", v as "skip" | "add");
   }));
 
-  const scopeBody = addRow(host, "查重范围");
-  scopeBody.appendChild(select(doc, [["deck", "仅当前牌组"], ["model", "整个模板（所有牌组）"]], s.ankiDupScope, (v) => {
+  const scopeBody = addRow(host, m.anki.duplicateScopeLabel);
+  scopeBody.appendChild(select(doc, [["deck", m.anki.duplicateScopeDeck], ["model", m.anki.duplicateScopeModel]], s.ankiDupScope, (v) => {
     setSetting("ankiDupScope", v as "deck" | "model");
   }));
 
-  const tagBody = addRow(host, "卡片标签", "逗号分隔，例如 pick2anki、生词");
-  tagBody.appendChild(textInput(doc, s.ankiTags, "如：生词、复习", (v) => setSetting("ankiTags", v)));
+  const tagBody = addRow(host, m.anki.tagsLabel, m.anki.tagsDescription);
+  tagBody.appendChild(textInput(doc, s.ankiTags, m.anki.tagsPlaceholder, (v) => setSetting("ankiTags", v)));
 
-  const edgeBody = addRow(host, "Edge TTS 发音兜底",
-    "词典发音与 HTTP 兜底都拿不到音频时，才用微软 Edge TTS 合成。"
-    + "Zotero 的浏览器 WebSocket 无法自定义 Cookie/Origin 头，成功率低且最慢（默认关闭）");
+  const edgeBody = addRow(host, m.anki.edgeTtsLabel, m.anki.edgeTtsDescription);
   edgeBody.appendChild(checkbox(doc, s.edgeTtsFallback, (v) => setSetting("edgeTtsFallback", v)));
 
   // 端到端自测：真实查词 + 真实写卡（结果只显示在面板内）
-  const selfBody = addRow(host, "端到端自测",
-    `先用 ${SELF_TEST_WORD}（长词恐惧症，34 个字母）走一遍完整链路，`
-    + `它查不到释义时会自动改用 ${FALLBACK_TEST_WORD} 继续（该词各词典源确实都没收录，属预期）`
-    + "：在线词典查词 → AnkiConnect 写卡（写入上面选定的牌组/模板，受重复策略约束）。"
-    + "刻意选长词是为了顺便压测超长单词的弹窗排版换行与音频文件名截断");
+  const selfBody = addRow(host, m.anki.selfTestLabel, m.anki.selfTestDescription(SELF_TEST_WORD, FALLBACK_TEST_WORD));
   const selfOut = div(doc, "zp-status");
-  selfBody.appendChild(asyncButton(doc, "写入测试卡", async () => {
+  selfBody.appendChild(asyncButton(doc, m.anki.selfTestButton, async () => {
     const settings = getSettings();
-    setStatus(`正在查词：${SELF_TEST_WORD}…`);
+    const operationMessages = getMessages(settings.uiLanguage);
+    setStatus(operationMessages.anki.lookingUp(SELF_TEST_WORD));
     let word = SELF_TEST_WORD;
     let bundle = await lookupWordOnline(word, settings.onlineDictSources);
     let note = "";
     if (!dictHasContent(bundle)) {
       // 意料之中：这个玩笑词没有词典释义。改用常用词继续，保证按钮在任何网络环境下都能完成自测。
-      note = `（${SELF_TEST_WORD} 各源均未收录，已自动改用 ${FALLBACK_TEST_WORD} 继续）`;
-      infoDictFailure(bundle); // 把各源原因写到状态行，便于判断"是词没收录"还是"网络不通"
+      note = operationMessages.anki.fallbackNotice(SELF_TEST_WORD, FALLBACK_TEST_WORD);
+      infoDictFailure(bundle, operationMessages);
       word = FALLBACK_TEST_WORD;
-      setStatus(`正在查词：${word}…`);
+      setStatus(operationMessages.anki.lookingUp(word));
       bundle = await lookupWordOnline(word, settings.onlineDictSources);
     }
     if (!dictHasContent(bundle)) {
-      selfOut.textContent = `词典未查到 ${word}，请检查网络或词典源开关`;
+      selfOut.textContent = operationMessages.anki.selfTestNoResult(word);
       selfOut.className = "zp-status zp-err";
-      setStatus("端到端自测中止：词典无结果", false);
+      setStatus(operationMessages.anki.selfTestStopped, false);
       return;
     }
     const res = await addWordCard(settings, {
       word,
-      contextSentence: `Pick2anki 端到端自测：${word}`,
-      cite: "来自 zotero-pick2anki 设置页自测",
+      contextSentence: operationMessages.anki.selfTestContext(word),
+      cite: operationMessages.anki.selfTestCitation,
       bundle,
-    }, undefined, (stage) => setStatus("端到端自测：" + stage));
+    }, undefined, (stage) => setStatus(operationMessages.anki.selfTestProgress(stage)));
     selfOut.textContent = (res.ok ? "✅ " : "❌ ") + res.message + note;
     selfOut.className = "zp-status " + (res.ok ? "zp-ok" : "zp-err");
-    setStatus(res.ok ? `✅ 端到端自测通过：已写入 Anki（${word}）` : "端到端自测失败", res.ok);
+    setStatus(res.ok ? operationMessages.anki.selfTestPassed(word) : operationMessages.anki.selfTestFailed, res.ok);
   }));
   selfBody.appendChild(selfOut);
 }
 
 /** 把某个词在各源的失败原因写到状态行（诊断"词没收录"还是"网络不通"） */
-function infoDictFailure(bundle: { sources: Array<{ name: string; ok: boolean; error?: string }> }): void {
-  const lines = bundle.sources.map((s) => `${s.name}：${s.ok ? "✅" : "❌ " + (s.error || "无结果")}`);
-  setStatus(lines.join("；"), false);
+function infoDictFailure(
+  bundle: DictLookupBundle,
+  m = messages(),
+): void {
+  const lines = bundle.sources.map((s) => m.dictionaries.sourceResult(
+    m.dictionaries.names[s.id], s.ok, dictSourceErrorText(s, m),
+  ));
+  setStatus(lines.join("\n"), false);
 }
 
 /** 拉取 Anki 牌组/模板元数据（与 Obsidian 版 refreshAnkiMeta 同逻辑） */
@@ -507,7 +547,7 @@ async function refreshAnkiMeta(force = false): Promise<void> {
   state.metaUrl = s.ankiConnectUrl;
   state.error = "";
   try {
-    await ankiVersion(s.ankiConnectUrl);
+    await ankiVersion(s.ankiConnectUrl, s.uiLanguage);
     const [decks, models] = await Promise.all([fetchAnkiDecks(s), fetchAnkiModels(s)]);
     state.decks = decks;
     state.models = models;
@@ -515,7 +555,7 @@ async function refreshAnkiMeta(force = false): Promise<void> {
     state.error = errText(e);
     state.decks = [];
     state.models = [];
-    log("读取 Anki 元数据失败：" + state.error);
+    log("Failed to load Anki metadata: " + state.error);
   }
 }
 
@@ -535,75 +575,74 @@ async function loadTemplateFields(model: string): Promise<void> {
 
 // ---------- 3. 触发与 Zotero 专属项 ----------
 function renderTriggerSection(doc: Document, host: HTMLElement, s: Pick2ankiSettings): void {
-  host.appendChild(heading(doc, "⚡ 触发与显示"));
-  const modeBody = addRow(host, "触发模式", "直接选中 = 划词弹窗出现即自动查词；Ctrl+选中 = 弹窗里先显示「🔍 查词」按钮，点击后才联网（"
-    + "Zotero 的划词弹窗不携带按键状态，故用“手动确认”等价实现该模式）");
-  modeBody.appendChild(select(doc, [["direct", "直接选中"], ["ctrl", "Ctrl+选中（手动点查词）"]], s.triggerMode, (v) => {
+  const m = getMessages(s.uiLanguage);
+  host.appendChild(heading(doc, m.trigger.sectionTitle));
+  const modeBody = addRow(host, m.trigger.modeLabel, m.trigger.modeDescription);
+  modeBody.appendChild(select(doc, [["direct", m.trigger.direct], ["ctrl", m.trigger.manual]], s.triggerMode, (v) => {
     setSetting("triggerMode", v as "direct" | "ctrl");
   }));
 
-  const wBody = addRow(host, "弹窗宽度(px)", "词典面板的固定宽度（默认 400，范围 240–720，且不超过阅读区宽度）。"
-    + "Zotero 的划词弹窗自带 max-width:198px 上限，插件会自动把它改成“面板宽 + 20px”的定值上限，"
-    + "所以这里的数值是真正生效的（改完下一次划词可见）");
+  const wBody = addRow(host, m.trigger.widthLabel, m.trigger.widthDescription);
   wBody.appendChild(textInput(doc, String(s.popupWidth), "400", (v) => {
     const n = Number(v);
     if (Number.isFinite(n) && n >= 240 && n <= 720) {
       setSetting("popupWidth", Math.round(n));
-      setStatus(`弹窗宽度已设为 ${Math.round(n)}px（下次划词生效）`, true);
+      setStatus(m.trigger.widthSet(Math.round(n)), true);
     } else {
-      setStatus("宽度需要是 240–720 之间的数字", false);
+      setStatus(m.trigger.widthInvalid, false);
     }
   }));
 
-  const hBody = addRow(host, "弹窗整体最大高度(px)", "词典面板总高度的上限（默认 260）。实际高度还会被限制为阅读区高度的 45%，"
-    + "所以调大也不会盖住大半个 PDF；标题行与按钮行始终可见，只有释义区滚动");
+  const hBody = addRow(host, m.trigger.heightLabel, m.trigger.heightDescription);
   hBody.appendChild(textInput(doc, String(s.popupMaxHeight), "260", (v) => {
     const n = Number(v);
     if (Number.isFinite(n) && n >= 120) {
       setSetting("popupMaxHeight", Math.round(n));
-      setStatus(`弹窗最大高度已设为 ${Math.round(n)}px（下次划词生效）`, true);
+      setStatus(m.trigger.heightSet(Math.round(n)), true);
     } else {
-      setStatus("高度需要是 ≥120 的数字", false);
+      setStatus(m.trigger.heightInvalid, false);
     }
   }));
 
-  const expandBody = addRow(host, "原句扩写", "开启后：优先从 PDF/EPUB 当前页文本层里截取包含该词的完整句子作为“原句”；"
-    + "取不到或结果不可信时，回退为“选中文本本身”");
+  const expandBody = addRow(host, m.trigger.sentenceExpandLabel, m.trigger.sentenceExpandDescription);
   expandBody.appendChild(checkbox(doc, s.sentenceExpand, (v) => setSetting("sentenceExpand", v)));
 
-  const citeBody = addRow(host, "附带文献条目信息", "开启后，“原句/来源”字段会附带《标题》· 作者 · (年份) 与 zotero:// 条目链接");
+  const citeBody = addRow(host, m.trigger.citeLabel, m.trigger.citeDescription);
   citeBody.appendChild(checkbox(doc, s.showCite, (v) => setSetting("showCite", v)));
 }
 
 // ---------- 4. 迁移 / 备份 ----------
-function renderMigrationSection(doc: Document, host: HTMLElement, _s: Pick2ankiSettings): void {
-  host.appendChild(heading(doc, "🔁 迁移 / 备份"));
-  addRow(host, "说明", "两版 Pick2anki 的设置项键名完全一致，因此可以直接把 Obsidian 版插件目录下 "
-    + "`.obsidian/plugins/pick-to-anki/data.json` 的内容粘贴到下面，点“导入”即可完成迁移（多余的键会被忽略）。");
+function renderMigrationSection(doc: Document, host: HTMLElement, s: Pick2ankiSettings): void {
+  const m = getMessages(s.uiLanguage);
+  host.appendChild(heading(doc, m.migration.sectionTitle));
+  addRow(host, m.migration.introductionLabel, m.migration.introduction);
 
-  const outBody = addRow(host, "导出当前设置", "JSON 文本，可复制留档");
+  const outBody = addRow(host, m.migration.exportLabel, m.migration.exportDescription);
   const ta = el(doc, "textarea", { attr: { readonly: "readonly" } });
   ta.value = exportSettingsJson();
   outBody.appendChild(ta);
 
-  const inBody = addRow(host, "导入设置", "粘贴 data.json 或本插件导出的 JSON，然后点“导入”（会覆盖同名设置项）");
+  const inBody = addRow(host, m.migration.importLabel, m.migration.importDescription);
   const input = el(doc, "textarea", { attr: { placeholder: "{ \"onlineDictSources\": [\"youdao\"], ... }" } });
+  input.value = importDraft;
+  input.addEventListener("input", () => { importDraft = input.value; });
   inBody.appendChild(input);
   const status = div(doc, "zp-status");
   const btns = div(doc, "zp-btn-bar");
-  btns.appendChild(button(doc, "导入", () => {
+  btns.appendChild(button(doc, m.common.importAction, () => {
     const res = importSettingsJson(input.value);
     status.textContent = (res.ok ? "✅ " : "❌ ") + res.message;
     status.className = "zp-status " + (res.ok ? "zp-ok" : "zp-err");
     setStatus(res.message, res.ok);
     if (res.ok) rerenderAll();
   }, true));
-  btns.appendChild(button(doc, "恢复默认值", () => {
-    if (!confirmDialog(doc, "确定把所有 Pick2anki 设置恢复为默认值？")) return;
+  btns.appendChild(button(doc, m.common.restoreDefaults, () => {
+    if (!confirmDialog(doc, m.migration.confirmReset)) return;
     const defaults = resetSettings();
-    status.textContent = `✅ 已恢复默认值（词典源：${defaults.onlineDictSources.join("、")}；Anki 写卡已关闭）`;
+    const names = formatList(defaults.onlineDictSources.map((id) => m.dictionaries.names[id]), s.uiLanguage);
+    status.textContent = `✅ ${m.migration.resetComplete(names)}`;
     status.className = "zp-status zp-ok";
-    setStatus("已恢复默认值", true);
+    setStatus(m.migration.resetComplete(names), true);
     rerenderAll();
   }));
   inBody.appendChild(btns);

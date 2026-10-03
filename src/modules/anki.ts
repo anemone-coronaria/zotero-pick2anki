@@ -18,11 +18,19 @@ import { edgeSynth, EDGE_VOICES } from "./edge-tts";
 import { fetchBinary as httpFetchBinary, request } from "./http";
 import { bytesToBase64 } from "./env";
 import { sha256Hex } from "./sha256";
+import { formatList, getLocale, getMessages, getMessagesForLocale } from "../i18n";
+import type { LanguagePreference, Messages } from "../i18n";
 
 // ---------- 底层 JSON-RPC ----------
 interface AnkiEnvelope<T> { result?: T; error?: string }
 
-export async function ankiInvoke<T>(action: string, params: unknown, url: string): Promise<T> {
+export async function ankiInvoke<T>(
+  action: string,
+  params: unknown,
+  url: string,
+  language: LanguagePreference = "en",
+): Promise<T> {
+  const messages = getMessages(language);
   let resp;
   try {
     resp = await request(url, {
@@ -32,36 +40,35 @@ export async function ankiInvoke<T>(action: string, params: unknown, url: string
       timeout: 30000,
     });
   } catch (e) {
-    throw new Error("无法连接 AnkiConnect：" + (e instanceof Error ? e.message : String(e))
-      + "。请先启动 Anki 并安装/启用 AnkiConnect 插件（工具→插件→AnkiConnect）。");
+    throw new Error(messages.anki.unreachable(e instanceof Error ? e.message : String(e)));
   }
   if (!resp || resp.status === 0 || resp.status >= 400) {
-    throw new Error(`AnkiConnect HTTP ${resp?.status ?? 0}：无法访问 ${url}`);
+    throw new Error(messages.anki.httpFailure(resp?.status ?? 0, url));
   }
   let data: AnkiEnvelope<T>;
   try { data = resp.json as AnkiEnvelope<T>; }
-  catch { throw new Error("AnkiConnect 返回内容不是合法 JSON"); }
-  if (!data || typeof data !== "object") throw new Error("AnkiConnect 返回内容不是合法 JSON");
-  if (typeof data.error === "string" && data.error) throw new Error("Anki 错误：" + data.error);
+  catch { throw new Error(messages.anki.invalidJson); }
+  if (!data || typeof data !== "object") throw new Error(messages.anki.invalidJson);
+  if (typeof data.error === "string" && data.error) throw new Error(messages.anki.serviceError(data.error));
   return data?.result as T;
 }
 
-export async function ankiVersion(url: string): Promise<number> {
-  return ankiInvoke<number>("version", {}, url);
+export async function ankiVersion(url: string, language: LanguagePreference = "en"): Promise<number> {
+  return ankiInvoke<number>("version", {}, url, language);
 }
 
 export async function fetchAnkiDecks(s: Pick2ankiSettings): Promise<string[]> {
-  const decks = await ankiInvoke<string[]>("deckNames", {}, s.ankiConnectUrl);
+  const decks = await ankiInvoke<string[]>("deckNames", {}, s.ankiConnectUrl, s.uiLanguage);
   return Array.isArray(decks) ? decks.sort((a, b) => a.localeCompare(b)) : [];
 }
 
 export async function fetchAnkiModels(s: Pick2ankiSettings): Promise<string[]> {
-  const models = await ankiInvoke<string[]>("modelNames", {}, s.ankiConnectUrl);
+  const models = await ankiInvoke<string[]>("modelNames", {}, s.ankiConnectUrl, s.uiLanguage);
   return Array.isArray(models) ? models.sort((a, b) => a.localeCompare(b)) : [];
 }
 
 export async function fetchAnkiModelFields(s: Pick2ankiSettings, model: string): Promise<string[]> {
-  const fields = await ankiInvoke<string[]>("modelFieldNames", { modelName: model }, s.ankiConnectUrl);
+  const fields = await ankiInvoke<string[]>("modelFieldNames", { modelName: model }, s.ankiConnectUrl, s.uiLanguage);
   return Array.isArray(fields) ? fields : [];
 }
 
@@ -97,32 +104,38 @@ function firstPlainExample(bundle: DictLookupBundle | null): string {
 }
 
 /** 每个字段写入的内容均为安全的 HTML（文本已转义，词典数据经样式渲染） */
-function buildFieldContent(src: AnkiFieldSource, input: CardInput, bundle: DictLookupBundle | null): string {
+function buildFieldContent(
+  src: AnkiFieldSource,
+  input: CardInput,
+  bundle: DictLookupBundle | null,
+  messages: Messages,
+  cardLanguage: LanguagePreference,
+): string {
   switch (src) {
     case "word": return escHtml(input.word.trim());
     case "phonetic": return escHtml(bundlePhoneticText(bundle));
     case "def_single": return bundle ? singleDefHtml(bundle) : "";
-    case "def_all": return bundle ? allDefsHtml(bundle) : "";
+    case "def_all": return bundle ? allDefsHtml(bundle, messages) : "";
     case "examples": return bundle ? examplesHtml(bundle) : "";
-    case "extra": return bundle ? extrasHtml(bundle) : "";
+    case "extra": return bundle ? extrasHtml(bundle, 6, messages) : "";
     case "source": {
       // 词典链接（bundleSourceText 的词典部分）+ Zotero 条目链接 + 文献条目信息
       const lines: string[] = [];
-      const dictPart = bundleSourceText(bundle, undefined).trim();
+      const dictPart = bundleSourceText(bundle, undefined, cardLanguage).trim();
       if (dictPart) lines.push(dictPart);
-      if (input.note?.uri) lines.push(`条目链接：${input.note.uri}`);
-      else if (input.note?.name) lines.push(`来源条目：${input.note.name}`);
+      if (input.note?.uri) lines.push(`${messages.card.itemLink}: ${input.note.uri}`);
+      else if (input.note?.name) lines.push(`${messages.card.sourceItem}: ${input.note.name}`);
       if (input.cite) lines.push(input.cite);
       return escHtml(lines.join("\n")).replace(/\n/g, "<br>");
     }
     case "context": {
       const lines: string[] = [];
       if (input.contextSentence) lines.push(input.contextSentence);
-      if (input.cite) lines.push(`—— 来自 ${input.cite}`);
-      else if (input.note?.name) lines.push(`—— 来自《${input.note.name}》`);
+      if (input.cite) lines.push(messages.card.fromCitation(input.cite));
+      else if (input.note?.name) lines.push(messages.card.fromItem(input.note.name));
       if (!lines.length) {
         const ex = firstPlainExample(bundle);
-        if (ex) lines.push(`（未取到原文句子，使用词典例句）${ex}`);
+        if (ex) lines.push(messages.card.contextFallback(ex));
       }
       return escHtml(lines.join("\n")).replace(/\n/g, "<br>");
     }
@@ -207,7 +220,7 @@ async function storeAudio(s: Pick2ankiSettings, input: CardInput): Promise<{ fil
   if (!bytes) return null;
   const fileName = `p2a-${sanitizeName(word).slice(0, 24)}-${shortHash(word + "|" + usedUrl)}.mp3`;
   try {
-    await ankiInvoke("storeMediaFile", { filename: fileName, data: bufToBase64(bytes) }, s.ankiConnectUrl);
+    await ankiInvoke("storeMediaFile", { filename: fileName, data: bufToBase64(bytes) }, s.ankiConnectUrl, s.uiLanguage);
     return { fileName, audioRef: `[sound:${fileName}]` };
   } catch { return null; }
 }
@@ -219,10 +232,13 @@ export async function addWordCard(
   modelFields?: string[],
   onProgress?: CardProgress,
 ): Promise<AddCardResult> {
+  const messages = getMessages(s.uiLanguage);
+  const cardLocale = s.cardLabelLanguage === "ui" ? getLocale(s.uiLanguage) : s.cardLabelLanguage;
+  const cardMessages = getMessagesForLocale(cardLocale);
   const fail = (msg: string): AddCardResult => ({ ok: false, added: false, skipped: false, message: msg });
-  if (!s.ankiEnabled) return fail("Anki 写卡未启用（设置 → 写入 Anki 单词卡）");
-  if (!s.ankiDeck) return fail("尚未选择目标牌组");
-  if (!s.ankiNoteType) return fail("尚未选择目标模板");
+  if (!s.ankiEnabled) return fail(messages.anki.disabled);
+  if (!s.ankiDeck) return fail(messages.anki.deckRequired);
+  if (!s.ankiNoteType) return fail(messages.anki.modelRequired);
 
   let fieldsList = modelFields;
   if (!fieldsList) {
@@ -230,12 +246,13 @@ export async function addWordCard(
     catch (e) { return fail(e instanceof Error ? e.message : String(e)); }
   }
   const { pairs, missing } = effectiveMapping(s, fieldsList);
+  const missingFields = formatList(missing, s.uiLanguage);
   if (pairs.length === 0) {
     return fail(missing.length > 0
-      ? `映射字段不在模板「${s.ankiNoteType}」中：${missing.join("、")}。请在设置中核对字段名`
-      : "尚未填写“内容 → 模板字段”映射（设置 → 写入 Anki 单词卡）");
+      ? messages.anki.mappedFieldsMissing(s.ankiNoteType, missingFields)
+      : messages.anki.mappingMissing);
   }
-  const missingWarn = missing.length > 0 ? `（以下字段不在模板中，已忽略：${missing.join("、")}）` : "";
+  const missingWarn = missing.length > 0 ? messages.anki.ignoredFields(missingFields) : "";
 
   const bundle = input.bundle && dictHasContent(input.bundle) ? input.bundle : null;
   // 同一模板字段可被多个内容源映射：内容按源顺序合并（多行），音频引用追加到末尾
@@ -246,7 +263,7 @@ export async function addWordCard(
       if (!audioFields.includes(field)) audioFields.push(field);
       continue;
     }
-    const content = buildFieldContent(src, input, bundle);
+    const content = buildFieldContent(src, input, bundle, cardMessages, cardLocale);
     if (!content) continue;
     const arr = fieldParts.get(field) ?? [];
     arr.push(content);
@@ -256,7 +273,7 @@ export async function addWordCard(
   // 音频：先存媒体库
   let audioWarn = "";
   if (audioFields.length > 0) {
-    onProgress?.("音频…");
+    onProgress?.(messages.anki.fetchingAudio);
     const media = await storeAudio(s, input);
     if (media) {
       for (const f of audioFields) {
@@ -265,7 +282,7 @@ export async function addWordCard(
         fieldParts.set(f, arr);
       }
     } else {
-      audioWarn = "（音频获取失败，已跳过音频字段）";
+      audioWarn = messages.anki.audioSkipped;
     }
   }
   const contents: Record<string, string> = {};
@@ -282,20 +299,20 @@ export async function addWordCard(
   const note = { deckName: s.ankiDeck, modelName: s.ankiNoteType, fields: contents, options, tags };
 
   try {
-    onProgress?.("写卡…");
+    onProgress?.(messages.anki.addingNote);
     if (s.ankiDup === "skip") {
-      const can = await ankiInvoke<boolean[]>("canAddNotes", { notes: [note] }, s.ankiConnectUrl);
+      const can = await ankiInvoke<boolean[]>("canAddNotes", { notes: [note] }, s.ankiConnectUrl, s.uiLanguage);
       if (Array.isArray(can) && can[0] === false) {
-        return { ok: true, added: false, skipped: true, message: `「${input.word}」已存在牌组「${s.ankiDeck}」中，已跳过${missingWarn}` };
+        return { ok: true, added: false, skipped: true, message: messages.anki.duplicateInDeck(input.word, s.ankiDeck) + missingWarn };
       }
     }
-    await ankiInvoke("addNote", { note }, s.ankiConnectUrl);
-    return { ok: true, added: true, skipped: false, message: `已写入 Anki：${input.word} → ${s.ankiDeck}${audioWarn}${missingWarn}` };
+    await ankiInvoke("addNote", { note }, s.ankiConnectUrl, s.uiLanguage);
+    return { ok: true, added: true, skipped: false, message: messages.anki.added(input.word, s.ankiDeck) + audioWarn + missingWarn };
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     // 竞态/查重策略差异导致 addNote 抛出 duplicate 时也按“跳过”处理
     if (/duplicate|重复/i.test(msg)) {
-      return { ok: true, added: false, skipped: true, message: `「${input.word}」已存在（Anki 拒绝重复），已跳过${missingWarn}` };
+      return { ok: true, added: false, skipped: true, message: messages.anki.duplicateRejected(input.word) + missingWarn };
     }
     return fail(msg);
   }

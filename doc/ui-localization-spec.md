@@ -1,6 +1,6 @@
 # Multilingual UI Specification
 
-Status: Draft  
+Status: Implemented
 Initial locales: English, Japanese, Simplified Chinese  
 Default locale: English
 

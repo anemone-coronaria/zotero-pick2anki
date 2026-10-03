@@ -5,8 +5,9 @@
 import { renderPrefsPane } from "./prefs-ui";
 import { getSettings } from "./settings-store";
 import type { Pick2ankiSettings } from "./settings";
-import { canUseOnlineDict, dictHasContent, lookupWordOnline } from "./online-dict";
+import { canUseOnlineDict, dictHasContent, dictSourceErrorText, lookupWordOnline } from "./online-dict";
 import { log } from "./env";
+import { getMessages } from "../i18n";
 
 /** 已经渲染过的面板根节点（避免 onload 多次触发时重复渲染） */
 const rendered = new WeakSet<Element>();
@@ -55,9 +56,13 @@ export const api: Pick2ankiApi = {
   },
 
   async testLookup(word: string): Promise<string[]> {
-    const bundle = await lookupWordOnline(word, getSettings().onlineDictSources);
-    const lines = bundle.sources.map((s) => `${s.name}：${s.ok ? "✅" : "❌ " + (s.error || "无结果")}`);
-    if (!dictHasContent(bundle)) lines.push("（全部词典源都没有结果）");
+    const settings = getSettings();
+    const messages = getMessages(settings.uiLanguage);
+    const bundle = await lookupWordOnline(word, settings.onlineDictSources);
+    const lines = bundle.sources.map((s) => messages.dictionaries.sourceResult(
+      messages.dictionaries.names[s.id], s.ok, dictSourceErrorText(s, messages),
+    ));
+    if (!dictHasContent(bundle)) lines.push(messages.dictionaries.noLookupResults);
     return lines;
   },
 };

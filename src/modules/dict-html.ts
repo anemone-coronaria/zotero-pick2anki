@@ -3,7 +3,9 @@
 // 设计：和查词弹窗一致 —— 每条释义自带与之对应的例句（一个释义一组例句），
 // 因此“例句”无需单独映射字段；释义字段即已包含例句。
 import type { DictDefinition, DictLookupBundle, DictResult } from "./dict-types";
-import { posPretty } from "./dict-utils";
+import { localizeExtraText, posPretty } from "./dict-utils";
+import { getMessages } from "../i18n";
+import type { Messages } from "../i18n";
 
 export function escHtml(s: string): string {
   return String(s ?? "")
@@ -84,13 +86,13 @@ function definitionWithSentences(def: DictDefinition, word: string): string {
 }
 
 /** 该源未被任何释义“认领”的额外例句（如有道 blng_sents_part），作补充小节 */
-function extraExamplesHtml(r: DictResult, word: string): string {
+function extraExamplesHtml(r: DictResult, word: string, messages: Messages): string {
   const used = new Set<string>();
   r.definitions.forEach((d) => { if (d.example) used.add(d.example.trim().toLowerCase()); });
   const rest = (r.examples || []).filter((ex) => !ex.en || !used.has(ex.en.trim().toLowerCase()));
   if (rest.length === 0) return "";
   const list = sentencesHtml(rest, word);
-  return `<div style="font-size:.85em;color:#888;margin:2px 0;">更多例句</div>${list}`;
+  return `<div style="font-size:.85em;color:#888;margin:2px 0;">${escHtml(messages.card.moreExamples)}</div>${list}`;
 }
 
 /** 单一释义（首个可用源的第一条）+ 该义项的例句 */
@@ -103,12 +105,12 @@ export function singleDefHtml(bundle: DictLookupBundle): string {
 }
 
 /** 全部释义（所有可用源）：每条释义各自携带对应例句；多源带源名，多余例句收进“更多例句” */
-export function allDefsHtml(bundle: DictLookupBundle): string {
+export function allDefsHtml(bundle: DictLookupBundle, messages: Messages = getMessages()): string {
   const out: string[] = [];
   const okSources = bundle.sources.filter((s) => s.ok && !!s.result && s.result.definitions.length > 0);
   for (const src of okSources) {
     const r = src.result as DictResult;
-    if (okSources.length > 1) out.push(`<div style="${SRC_TITLE}">${escHtml(src.name)}</div>`);
+    if (okSources.length > 1) out.push(`<div style="${SRC_TITLE}">${escHtml(messages.dictionaries.names[src.id])}</div>`);
     const many = r.definitions.length > 1;
     r.definitions.forEach((d, i) => {
       const num = many ? `<span style="${NUMS}">${i + 1}.</span>` : "";
@@ -119,7 +121,7 @@ export function allDefsHtml(bundle: DictLookupBundle): string {
       const sent = sentencesHtml(pairs, r.word);
       if (sent) out.push(sent);
     });
-    const extra = extraExamplesHtml(r, r.word);
+    const extra = extraExamplesHtml(r, r.word, messages);
     if (extra) out.push(extra);
   }
   return out.join("");
@@ -160,7 +162,7 @@ export function examplesHtml(bundle: DictLookupBundle, limit = 10): string {
 }
 
 /** 附加信息（词形/搭配/考试标签等） */
-export function extrasHtml(bundle: DictLookupBundle, limit = 6): string {
+export function extrasHtml(bundle: DictLookupBundle, limit = 6, messages: Messages = getMessages()): string {
   const lines: string[] = [];
   const seen = new Set<string>();
   for (const s of bundle.sources) {
@@ -168,7 +170,7 @@ export function extrasHtml(bundle: DictLookupBundle, limit = 6): string {
     for (const e of s.result.extras) {
       if (!e || seen.has(e.slice(0, 30))) continue;
       seen.add(e.slice(0, 30));
-      lines.push(`<div style="color:#666;font-size:.92em;margin:1px 0;">${escHtml(e)}</div>`);
+      lines.push(`<div style="color:#666;font-size:.92em;margin:1px 0;">${escHtml(localizeExtraText(e, messages))}</div>`);
       if (lines.length >= limit) return lines.join("");
     }
   }

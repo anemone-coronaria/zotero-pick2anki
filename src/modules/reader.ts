@@ -19,6 +19,8 @@ import { sentenceContains } from "./sentence";
 import { div, el, empty } from "./zdom";
 import { log } from "./env";
 import { READER_CSS_ID, readerCssText } from "./styles";
+import { getLocale, getMessagesForLocale } from "../i18n";
+import type { Messages, SupportedLocale } from "../i18n";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -45,6 +47,8 @@ interface PopupState {
   lookupBtn: HTMLButtonElement | null;
   adding: boolean;
   seq: number;
+  locale: SupportedLocale;
+  messages: Messages;
 }
 
 /** 注册 reader 事件（返回解绑函数，供插件卸载时调用） */
@@ -102,7 +106,7 @@ function onRenderSelectionPopup(event: ReaderSelectionEvent): void {
 
   if (settings.triggerMode === "ctrl") {
     // 触发模式 = Ctrl+选中：不自动联网，等用户点「查词」
-    state.dictEl.textContent = "已选中「" + word + "」，点击「🔍 查词」联网查询";
+    state.dictEl.textContent = state.messages.reader.selectedPrompt(word);
   } else {
     void runLookup(state, settings);
   }
@@ -119,6 +123,8 @@ function readSelectionText(event: ReaderSelectionEvent): string {
 
 // ---------- 弹窗 DOM（结构对齐 Obsidian 版：标题栏 + 释义区 + 按钮行） ----------
 function createPopup(doc: Document, word: string, event: ReaderSelectionEvent, settings: Pick2ankiSettings): PopupState {
+  const locale = getLocale(settings.uiLanguage);
+  const messages = getMessagesForLocale(locale);
   const root = div(doc, "zop2a-popup");
   const viewW = doc.defaultView?.innerWidth || 800;
   const viewH = doc.defaultView?.innerHeight || 800;
@@ -148,12 +154,12 @@ function createPopup(doc: Document, word: string, event: ReaderSelectionEvent, s
   // 标题行与按钮行固定不压缩，只有释义区滚动 → 「➕ Anki」永远可见
 
   const hdr = div(doc, "p2a-section-hdr");
-  hdr.appendChild(div(doc, "p2a-label", "📖 在线词典"));
+  hdr.appendChild(div(doc, "p2a-label", messages.reader.sectionTitle));
   hdr.appendChild(div(doc, "p2a-word", word));
   root.appendChild(hdr);
 
   const dictEl = div(doc, "p2a-text");
-  dictEl.textContent = "查询中…";
+  dictEl.textContent = messages.reader.lookingUp;
   root.appendChild(dictEl);
 
   const state: PopupState = {
@@ -169,6 +175,8 @@ function createPopup(doc: Document, word: string, event: ReaderSelectionEvent, s
     msgEl: null,
     adding: false,
     seq: 0,
+    locale,
+    messages,
   };
 
   // 原句 + 文献条目信息（不联网即可准备，写卡时用）
@@ -178,13 +186,13 @@ function createPopup(doc: Document, word: string, event: ReaderSelectionEvent, s
   // 按钮行
   const btnRow = div(doc, "p2a-btn-row");
   if (settings.triggerMode === "ctrl") {
-    const lookBtn = el(doc, "button", { cls: "p2a-anki", text: "🔍 查词" });
+    const lookBtn = el(doc, "button", { cls: "p2a-anki", text: messages.reader.lookupButton });
     lookBtn.onclick = () => { void runLookup(state, getSettings()); };
     state.lookupBtn = lookBtn;
     btnRow.appendChild(lookBtn);
   }
   if (settings.ankiEnabled) {
-    const b = el(doc, "button", { cls: "p2a-anki", text: "➕ Anki" });
+    const b = el(doc, "button", { cls: "p2a-anki", text: messages.reader.addButton });
     b.onclick = () => { void addSelectionToAnki(state, getSettings()); };
     state.ankiBtn = b;
     btnRow.appendChild(b);
@@ -232,11 +240,11 @@ function scrollToTop(dictEl: HTMLElement): void {
 // ---------- 查词 ----------
 async function runLookup(state: PopupState, settings: Pick2ankiSettings): Promise<void> {
   const seq = ++state.seq;
-  state.dictEl.textContent = "查询中…";
+  state.dictEl.textContent = state.messages.reader.lookingUp;
   setMessage(state, "");
   const sources = settings.onlineDictSources || [];
   if (sources.length === 0) {
-    state.dictEl.textContent = "未启用任何词典源，请在 设置 → Pick2anki → 在线词典查词 中勾选";
+    state.dictEl.textContent = state.messages.reader.noSources;
     return;
   }
   const bundle = await lookupWordOnline(state.word, sources);
@@ -244,7 +252,7 @@ async function runLookup(state: PopupState, settings: Pick2ankiSettings): Promis
   const has = dictHasContent(bundle);
   state.bundle = has ? bundle : null;
   empty(state.dictEl);
-  renderBundleInto(state.doc, state.dictEl, bundle);
+  renderBundleInto(state.doc, state.dictEl, bundle, 2, state.locale);
   scrollToTop(state.dictEl);
   // 可选自动写卡（与 Obsidian 版同语义）
   if (has && settings.ankiEnabled && settings.ankiAutoAdd) {
@@ -255,27 +263,28 @@ async function runLookup(state: PopupState, settings: Pick2ankiSettings): Promis
 // ---------- 写卡（全程静默：只在面板内更新按钮状态与一行提示，不弹系统浮窗） ----------
 async function addSelectionToAnki(state: PopupState, settings: Pick2ankiSettings): Promise<void> {
   if (state.adding) return;
+  const operationSettings: Pick2ankiSettings = { ...settings, uiLanguage: state.locale };
   const word = state.word.trim();
-  if (!word) { setMessage(state, "请先选中一个单词/短语", true); return; }
-  if (!canUseOnlineDict(word)) { setMessage(state, "仅英文单词/短语可写入 Anki 卡片", true); return; }
-  if (!settings.ankiEnabled) { setMessage(state, "Anki 写卡未启用：设置 → Pick2anki → 写入 Anki 单词卡", true); return; }
-  if (!settings.ankiDeck || !settings.ankiNoteType) { setMessage(state, "请先在设置中配置目标牌组与模板", true); return; }
-  if ((settings.onlineDictSources || []).length === 0) { setMessage(state, "未启用任何词典源：设置 → Pick2anki → 在线词典查词", true); return; }
+  if (!word) { setMessage(state, state.messages.reader.selectWord, true); return; }
+  if (!canUseOnlineDict(word)) { setMessage(state, state.messages.reader.englishOnly, true); return; }
+  if (!operationSettings.ankiEnabled) { setMessage(state, state.messages.reader.ankiDisabled, true); return; }
+  if (!operationSettings.ankiDeck || !operationSettings.ankiNoteType) { setMessage(state, state.messages.reader.configureAnki, true); return; }
+  if ((operationSettings.onlineDictSources || []).length === 0) { setMessage(state, state.messages.reader.noDictionarySources, true); return; }
 
   state.adding = true;
-  setAnkiButton(state, "busy", "准备…");
+  setAnkiButton(state, "busy", state.messages.reader.preparing);
   setMessage(state, "");
   try {
     let bundle = state.bundle;
     if (!bundle) {
-      setAnkiButton(state, "busy", "查词…");
-      const b = await lookupWordOnline(word, settings.onlineDictSources);
+      setAnkiButton(state, "busy", state.messages.reader.lookingUp);
+      const b = await lookupWordOnline(word, operationSettings.onlineDictSources);
       bundle = dictHasContent(b) ? b : null;
       state.bundle = bundle;
     }
     if (!bundle) {
       setAnkiButton(state, "err");
-      setMessage(state, `词典未查到「${word}」的释义，未写入卡片（可检查网络或更换词典源）`, true);
+      setMessage(state, state.messages.reader.noDefinition(word), true);
       return;
     }
     const input: CardInput = {
@@ -284,26 +293,26 @@ async function addSelectionToAnki(state: PopupState, settings: Pick2ankiSettings
       note: state.itemCtx
         ? { name: state.itemCtx.title || word, uri: state.itemCtx.uri }
         : undefined,
-      cite: settings.showCite ? (state.itemCtx?.cite || undefined) : undefined,
+      cite: operationSettings.showCite ? (state.itemCtx?.cite || undefined) : undefined,
       bundle,
     };
     // 各阶段回显到按钮上（音频下载/上传最慢，用户能看出在做什么）
-    const res = await addWordCard(settings, input, undefined, (stage) => {
+    const res = await addWordCard(operationSettings, input, undefined, (stage) => {
       setAnkiButton(state, "busy", stage);
     });
     if (!res.ok) {
       setAnkiButton(state, "err");
-      setMessage(state, "Anki 写入失败：" + res.message, true);
+      setMessage(state, state.messages.reader.addFailed(res.message), true);
     } else if (res.skipped) {
       setAnkiButton(state, "dup");
-      setMessage(state, `「${word}」已存在，已跳过`);
+      setMessage(state, state.messages.reader.duplicate(word));
     } else if (res.added) {
       setAnkiButton(state, "ok");
       setMessage(state, ""); // 成功保持静默，按钮变 ✔ 即反馈
     }
   } catch (e) {
     setAnkiButton(state, "err");
-    setMessage(state, "Anki 写入失败：" + (e instanceof Error ? e.message : String(e)), true);
+    setMessage(state, state.messages.reader.addFailed(e instanceof Error ? e.message : String(e)), true);
   } finally {
     state.adding = false;
   }
@@ -322,13 +331,13 @@ function setAnkiButton(state: PopupState, st: "busy" | "ok" | "dup" | "err", sta
   }
   btn.disabled = false;
   if (st === "ok") {
-    btn.textContent = "✔ Anki";
+    btn.textContent = state.messages.reader.addedButton;
     btn.classList.add("p2a-anki-ok");
   } else if (st === "dup") {
-    btn.textContent = "↺ 已有";
+    btn.textContent = state.messages.reader.duplicateButton;
     btn.classList.add("p2a-anki-dup");
   } else {
-    btn.textContent = "➕ Anki";
+    btn.textContent = state.messages.reader.addButton;
     btn.classList.add("p2a-anki-err");
   }
 }

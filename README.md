@@ -38,7 +38,7 @@ Both plugins append their own panels to Zotero's selection popup through the off
 | **Nine configurable field sources** | Map word/phrase, context, phonetics, single definition, all definitions, examples, extras, audio, and source information to fields in your note type. Blank mappings are omitted; multiple sources mapped to one field are merged. |
 | **Pronunciation** | Prefers dictionary recordings (UK/US), then tries Youdao pronunciation and optional Edge TTS. Audio is stored in Anki's media library through AnkiConnect and referenced as `[sound:…]` for offline playback. |
 | **Context and provenance** | Attempts to extract the complete sentence from the PDF text layer, falling back to the selected text. The source field includes dictionary links, the Zotero item URI, and publication information: title, authors, and year. |
-| **Chinese interface and Obsidian-compatible settings** | Setting keys and shared defaults match the Obsidian version. Paste its `data.json` to migrate settings. |
+| **Multilingual interface and Obsidian-compatible settings** | The UI supports English, Japanese, and Simplified Chinese, with English as the default and an optional system-language mode. Setting keys and shared defaults remain compatible with the Obsidian version. |
 | **Lightweight** | No AI or sentence-translation dependency, no lookup cache, no additional hosted backend, and no API key. |
 
 ## Installation
@@ -109,15 +109,17 @@ zotero-plugin-scaffold generates `update.json` with the version, download URL, S
 
 ## Usage
 
+At the top of Pick2anki's settings, choose English, 日本語, 简体中文, or the system language. The settings panel updates immediately, and newly opened reader popups use the selected language. The next selector controls labels that Pick2anki adds to new Anki cards; dictionary definitions, publication data, and existing Anki names remain unchanged.
+
 ### 1. Look up a word
 
-**Select an English word or phrase** in Zotero's PDF/EPUB reader. A “📖 在线词典” (Online dictionary) section appears in the selection popup:
+**Select an English word or phrase** in Zotero's PDF/EPUB reader. An **Online dictionary** section appears in the selection popup:
 
 - Part-of-speech badges (noun, adj., etc.), separate colors for English and Chinese definitions, and examples following their definitions. Matching words are bold.
 - Content scrolls inside the panel when it exceeds the height limit (260 px by default).
-- Direct selection mode queries immediately. “Ctrl+selection” mode instead shows “🔍 查词” (Look up); click it to query.
+- Direct selection mode queries immediately. “Ctrl+selection” mode instead shows **Look up**; click it to query.
 
-Under Settings → Pick2anki → Online dictionary lookup, drag sources to reorder them, use the switches to disable sources, and click “试查 hello” (Test lookup: hello) to check connectivity.
+Under Settings → Pick2anki → Online dictionary lookup, drag sources to reorder them, use the switches to disable sources, and click **Test lookup: hello** to check connectivity.
 
 > Collins, Oxford, and Cambridge may change their websites or block requests (including HTTP 403 responses observed in testing). Failed sources are skipped. The upstream documentation reports Youdao and Bing as the most reliable sources.
 
@@ -127,11 +129,11 @@ Install Anki desktop and enable [AnkiConnect](https://foosoft.net/projects/anki-
 
 Under Settings → Pick2anki → Save Anki vocabulary cards:
 
-1. Enable Anki saving and click “测试连接并读取” (Test connection and load) to retrieve decks and note types.
+1. Enable Anki saving and click **Test connection and load** to retrieve decks and note types.
 2. Choose a target deck (subdecks use `::`) and note type. Changing the note type loads its fields automatically.
 3. Use the field-mapping dropdowns to assign each content source to a field. Leave a mapping blank to omit it.
 4. Optionally enable automatic saving after lookup and configure duplicate handling (skip/add), duplicate scope, and tags.
-5. Click “写入测试卡（hello）” (Save test card: hello) to test lookup and saving in the selected deck and note type.
+5. Click **Save test card: hello** to test lookup and saving in the selected deck and note type.
 
 Click **➕ Anki** in the selection popup to save. The button changes to ⏳ while saving, ✔ on success, ↺ if the note already exists, or back to ➕ on failure, with an inline error message.
 
@@ -157,6 +159,8 @@ Shared settings use the same keys as the Obsidian version of Pick2anki:
 
 | Setting | Key | Default | Description |
 |---|---|---|---|
+| Interface language | `uiLanguage` | `en` | `en`, `ja`, `zh-Hans`, or `system`. System mode follows Zotero/OS and falls back to English for unsupported locales. |
+| Card label language | `cardLabelLanguage` | `ui` | Selectable below the interface language. Uses the UI language for Pick2anki-authored card labels, or a fixed supported language. Dictionary and bibliographic content is preserved. |
 | Trigger mode | `triggerMode` | `direct` | `direct`: query on selection; `ctrl`: click Look up in the popup. |
 | Trigger delay | `triggerDebounce` | `500` | Reserved for compatibility with the Obsidian schema; Zotero uses selection events and does not need debouncing. |
 | Dictionary sources and order | `onlineDictSources` | Youdao → Bing → Cambridge → Collins → Oxford | Enable/disable and drag to reorder. |

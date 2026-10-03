@@ -8,6 +8,8 @@ declare namespace _ZoteroTypes {
   interface Prefs {
     PluginPrefsMap: {
       "triggerMode": string;
+      "uiLanguage": string;
+      "cardLabelLanguage": string;
       "triggerDebounce": number;
       "onlineDictSources": string;
       "ankiEnabled": boolean;

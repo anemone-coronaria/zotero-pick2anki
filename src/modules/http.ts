@@ -7,6 +7,7 @@
 //   4) fetchText()：语义与原 dict-utils.fetchText 完全一致（非 200 抛错、空响应抛错）
 import type { HttpResponse, HttpRequestOptions } from "../types";
 import { log } from "./env";
+import { getMessages } from "../i18n";
 
 export type { HttpResponse, HttpRequestOptions };
 
@@ -27,7 +28,7 @@ function zoteroHttp(): {
   const http = (globalThis as unknown as { Zotero?: { HTTP?: unknown } }).Zotero?.HTTP as
     { request?: unknown } | undefined;
   if (!http || typeof http.request !== "function") {
-    throw new Error("Zotero.HTTP 不可用（本模块只能在 Zotero 插件环境内调用）");
+    throw new Error(getMessages().errors.httpUnavailable);
   }
   return http as { request: (m: string, u: string, o?: Record<string, unknown>) => Promise<unknown> };
 }
@@ -92,7 +93,7 @@ export async function request(url: string, opts: HttpRequestOptions = {}): Promi
     xhr = xhrFromError(e);
     if (!xhr) {
       // 真正的网络层错误：DNS 解析失败 / 连接被拒 / 超时
-      throw new Error(`${method} ${url} 请求失败：${e instanceof Error ? e.message : String(e)}`);
+      throw new Error(getMessages().errors.requestFailed(method, url, e instanceof Error ? e.message : String(e)));
     }
     log(`${method} ${url} → HTTP ${xhr.status}`);
   }
@@ -104,7 +105,7 @@ export async function fetchText(url: string, timeoutMs = 20000): Promise<string>
   const resp = await request(url, { method: "GET", timeout: timeoutMs });
   if (resp.status !== 200) throw new Error(`HTTP ${resp.status}`);
   const txt = resp.text;
-  if (!txt) throw new Error("空响应");
+  if (!txt) throw new Error(getMessages().errors.emptyResponse);
   return txt;
 }
 

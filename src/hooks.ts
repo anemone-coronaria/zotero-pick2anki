@@ -28,7 +28,7 @@ async function onStartup(): Promise<void> {
   log(`${config.addonName} 已加载（插件 ID ${config.addonID}）`);
 }
 
-/** 注册偏好面板（中文界面；stylesheets 复用弹窗同一份 CSS） */
+/** 注册偏好面板（多语言界面；stylesheets 复用弹窗同一份 CSS） */
 function registerPrefsPane(): void {
   try {
     Zotero.PreferencePanes.register({

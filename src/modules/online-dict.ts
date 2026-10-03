@@ -12,6 +12,8 @@ import { collinsAdapter } from "./collins-dict";
 import { oxfordAdapter } from "./oxford-dict";
 
 import { posPretty } from "./dict-utils";
+import { formatList, getMessages } from "../i18n";
+import type { LanguagePreference, Messages } from "../i18n";
 
 export type { DictLookupBundle, DictResult, DictDefinition, DictExample, DictSourceId };
 export type { DictAdapter, DictAudioUrl };
@@ -44,18 +46,34 @@ export async function lookupWordOnline(word: string, ids: DictSourceId[] = DICT_
   const wanted = (ids && ids.length > 0 ? ids : DICT_ADAPTERS.map((a) => a.id));
   const results = await Promise.all(wanted.map(async (id) => {
     const adapter = ADAPTER_MAP[id];
-    if (!adapter) return { id, name: id, url: "", ok: false, error: "未知词典源" };
+    if (!adapter) return { id, name: id, url: "", ok: false, errorCode: "unknown_source" as const };
     try {
       const result = await adapter.lookup(word0);
       if (result && result.definitions.length > 0) {
         return { id: adapter.id, name: adapter.name, url: adapter.sourceUrlFor(word0), ok: true, result };
       }
-      return { id: adapter.id, name: adapter.name, url: adapter.sourceUrlFor(word0), ok: false, error: "未收录或无有效释义" };
+      return { id: adapter.id, name: adapter.name, url: adapter.sourceUrlFor(word0), ok: false, errorCode: "no_entry" as const };
     } catch (e) {
-      return { id: adapter.id, name: adapter.name, url: adapter.sourceUrlFor(word0), ok: false, error: e instanceof Error ? e.message : String(e) };
+      return {
+        id: adapter.id,
+        name: adapter.name,
+        url: adapter.sourceUrlFor(word0),
+        ok: false,
+        errorCode: "lookup_failed" as const,
+        error: e instanceof Error ? e.message : String(e),
+      };
     }
   }));
   return { word: word0, sources: results };
+}
+
+export function dictSourceErrorText(
+  source: DictLookupBundle["sources"][number],
+  messages: Messages,
+): string {
+  if (source.errorCode === "unknown_source") return messages.dictionaries.unknownSource;
+  if (source.errorCode === "no_entry") return messages.dictionaries.noEntry;
+  return source.error || messages.common.noResults;
 }
 
 // ---------- 展示 ----------
@@ -74,7 +92,12 @@ export function defLine(d: DictDefinition, withPos = true): string {
 }
 
 /** 纯文本预览（调试用；弹窗实际使用 dict-render 的 DOM 渲染） */
-export function formatDictBundle(bundle: DictLookupBundle, maxSources = 2): string {
+export function formatDictBundle(
+  bundle: DictLookupBundle,
+  maxSources = 2,
+  language: LanguagePreference = "en",
+): string {
+  const messages = getMessages(language);
   const lines: string[] = [];
   const okSources = bundle.sources.filter((s) => s.ok && !!s.result);
   const shown = okSources.slice(0, Math.max(1, maxSources));
@@ -86,8 +109,8 @@ export function formatDictBundle(bundle: DictLookupBundle, maxSources = 2): stri
       .filter((ex) => !ex.en || !usedEx.has(ex.en.trim().toLowerCase()))
       .slice(0, 8);
     lines.push("");
-    lines.push(`【${src.name}】${src.url}`);
-    if (r.phonetic) lines.push("音标: " + r.phonetic);
+    lines.push(`【${messages.dictionaries.names[src.id]}】${src.url}`);
+    if (r.phonetic) lines.push(messages.dictionaries.pronunciation + ": " + r.phonetic);
     const multi = r.definitions.length > 1;
     r.definitions.forEach((d, i) => {
       const prefix = multi ? `${i + 1}. ` : "";
@@ -97,11 +120,11 @@ export function formatDictBundle(bundle: DictLookupBundle, maxSources = 2): stri
       const body = zh && meaning && zh !== meaning ? `${zh}  ${meaning}` : (zh || meaning);
       if (body.trim()) lines.push(`${prefix}${pos}${body}`);
       if (d.example) {
-        lines.push(`  例: ${d.example}${d.exampleZh ? " — " + d.exampleZh : ""}`);
+        lines.push(`  · ${d.example}${d.exampleZh ? " — " + d.exampleZh : ""}`);
       }
     });
     if (restExamples.length) {
-      lines.push("  更多例句：");
+      lines.push(`  ${messages.dictionaries.moreExamples}:`);
       for (const ex of restExamples) {
         lines.push(`  · ${ex.en || ""}${ex.en && ex.zh ? " — " + ex.zh : ""}`);
       }
@@ -110,11 +133,11 @@ export function formatDictBundle(bundle: DictLookupBundle, maxSources = 2): stri
   }
   const hidden = okSources.length - shown.length;
   if (hidden > 0) {
-    const names = okSources.slice(shown.length).map((s) => s.name);
-    lines.push(`…（另有 ${names.join("、")} 收录该词，弹窗未展开）`);
+    const names = okSources.slice(shown.length).map((s) => messages.dictionaries.names[s.id]);
+    lines.push(messages.dictionaries.hiddenSources(formatList(names, language)));
   }
   const out = lines.join("\n").trim();
-  return out || "在线词典未查询到结果";
+  return out || messages.dictionaries.noLookupResults;
 }
 
 // ---------- 供 Anki 字段映射使用的提取函数（bundle 允许为 null：无结果返回空） ----------
@@ -203,16 +226,21 @@ export function bundleExtraText(bundle: DictLookupBundle | null): string {
 }
 
 export interface BundleNoteRef { name: string; uri?: string }
-export function bundleSourceText(bundle: DictLookupBundle | null, note?: BundleNoteRef): string {
+export function bundleSourceText(
+  bundle: DictLookupBundle | null,
+  note?: BundleNoteRef,
+  language: LanguagePreference = "en",
+): string {
+  const messages = getMessages(language);
   const lines: string[] = [];
   if (bundle) {
     for (const s of bundle.sources) {
       if (!s.ok) continue;
-      lines.push(`${s.name}：${s.url}`);
+      lines.push(`${messages.dictionaries.names[s.id]}: ${s.url}`);
     }
   }
   if (note?.name) {
-    lines.push(note.uri ? `笔记链接：${note.uri}` : `来源笔记：${note.name}`);
+    lines.push(note.uri ? `${messages.card.itemLink}: ${note.uri}` : `${messages.card.sourceItem}: ${note.name}`);
   }
   return lines.join("\n");
 }

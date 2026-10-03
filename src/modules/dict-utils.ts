@@ -3,6 +3,7 @@
 // Zotero 插件没有 requestUrl：网络能力抽到 http.ts（Zotero.HTTP），这里改为转发导出，
 // 因此 5 个词典适配器的 import 语句与解析逻辑保持一字未改。
 import { getDOMParser } from "./env";
+import type { Messages } from "../i18n";
 
 export { fetchText, HTTP_UA } from "./http";
 
@@ -54,12 +55,20 @@ export function absUrl(u: string, base: string): string {
 /** 解析词典 HTML（插件沙箱里没有全局 DOMParser，从 Zotero 主窗口借用；只读不改） */
 export function parseHtml(html: string): Document {
   const DP = getDOMParser();
-  if (!DP) throw new Error("当前环境缺少 DOMParser，无法解析词典页面");
+  if (!DP) throw new Error("DOMParser is unavailable, so the dictionary page cannot be parsed");
   return new DP().parseFromString(html, "text/html");
 }
 
 export function slugify(word: string): string {
   return word.trim().toLowerCase().replace(/\s+/g, "-");
+}
+
+/** Translate labels added by Pick2anki while preserving dictionary-provided content. */
+export function localizeExtraText(value: string, messages: Messages): string {
+  return value
+    .replace(/^词形[：:]\s*/, `${messages.card.wordForms}${messages.card.labelSeparator}`)
+    .replace(/^考试范围[：:]\s*/, `${messages.card.examCategories}${messages.card.labelSeparator}`)
+    .replace(/^常用短语[：:]\s*/, `${messages.card.commonPhrases}${messages.card.labelSeparator}`);
 }
 
 /** 从标签文本中解析 “英 /x/ 美 /y/” 或一串 /phon/ 音标 */

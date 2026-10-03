@@ -7,6 +7,7 @@ import { config } from "../../package.json";
 import type { AnkiFieldSource, OnlineDictSource, Pick2ankiSettings } from "./settings";
 import { ANKI_FIELD_SOURCES, DEFAULT_SETTINGS, ONLINE_DICT_SOURCES } from "./settings";
 import { log } from "./env";
+import { getMessages, SUPPORTED_LOCALES } from "../i18n";
 
 const PREFIX = config.prefsPrefix;
 
@@ -21,7 +22,7 @@ type ZoteroPrefs = {
 
 function prefs(): ZoteroPrefs {
   const p = (globalThis as unknown as { Zotero?: { Prefs?: unknown } }).Zotero?.Prefs as ZoteroPrefs | undefined;
-  if (!p) throw new Error("Zotero.Prefs 不可用（本模块只能在 Zotero 插件环境内调用）");
+  if (!p) throw new Error(getMessages().errors.prefsUnavailable);
   return p;
 }
 
@@ -101,6 +102,10 @@ function normalize(input: Pick2ankiSettings): Pick2ankiSettings {
   if (out.triggerMode !== "ctrl") out.triggerMode = "direct";
   if (out.ankiDup !== "add") out.ankiDup = "skip";
   if (out.ankiDupScope !== "model") out.ankiDupScope = "deck";
+  if (out.uiLanguage !== "system" && !SUPPORTED_LOCALES.includes(out.uiLanguage)) out.uiLanguage = "en";
+  if (out.cardLabelLanguage !== "ui" && !SUPPORTED_LOCALES.includes(out.cardLabelLanguage)) {
+    out.cardLabelLanguage = "ui";
+  }
   return out;
 }
 
@@ -156,14 +161,15 @@ export function exportSettingsJson(): string {
  * `.obsidian/plugins/pick-to-anki/data.json`（键名一致，可直接粘贴导入）。
  */
 export function importSettingsJson(json: string): { ok: boolean; message: string; applied: number } {
+  const messages = getMessages(getSettings().uiLanguage);
   let parsed: unknown;
   try {
     parsed = JSON.parse(json);
   } catch (e) {
-    return { ok: false, message: "JSON 解析失败：" + (e instanceof Error ? e.message : String(e)), applied: 0 };
+    return { ok: false, message: messages.migration.jsonParseFailed(e instanceof Error ? e.message : String(e)), applied: 0 };
   }
   if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-    return { ok: false, message: "JSON 内容不是设置对象", applied: 0 };
+    return { ok: false, message: messages.migration.invalidObject, applied: 0 };
   }
   const data = parsed as Record<string, unknown>;
   const keys = Object.keys(DEFAULT_SETTINGS) as Array<keyof Pick2ankiSettings>;
@@ -176,8 +182,8 @@ export function importSettingsJson(json: string): { ok: boolean; message: string
     patch[key as string] = decoded;
     applied++;
   }
-  if (applied === 0) return { ok: false, message: "没有识别到任何设置项（请确认粘贴的是 data.json 内容）", applied: 0 };
+  if (applied === 0) return { ok: false, message: messages.migration.noSettings, applied: 0 };
   const saved = saveSettings(patch as Partial<Pick2ankiSettings>);
   log(`导入设置完成，共应用 ${applied} 项：${saved.onlineDictSources.join(",")}`);
-  return { ok: true, message: `已导入 ${applied} 项设置`, applied };
+  return { ok: true, message: messages.migration.imported(applied), applied };
 }

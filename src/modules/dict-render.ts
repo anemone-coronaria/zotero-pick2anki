@@ -7,8 +7,10 @@
 //      不能依赖全局 document）
 //   2) Obsidian 的 createDiv/createSpan/createEl 扩展 → zdom.ts 中的等价工具
 import type { DictDefinition, DictLookupBundle, DictResult } from "./dict-types";
-import { posPretty } from "./dict-utils";
+import { localizeExtraText, posPretty } from "./dict-utils";
 import { div, el, span } from "./zdom";
+import { formatList, getMessages } from "../i18n";
+import type { LanguagePreference } from "../i18n";
 
 function hasCjk(s: string): boolean {
   return /[\u4e00-\u9fff]/.test(s);
@@ -78,11 +80,18 @@ function renderDefinition(doc: Document, container: HTMLElement, def: DictDefini
 }
 
 /** 把查词结果渲染进 popup 内容容器（只渲染“排序最前且可用 maxSources 个源”） */
-export function renderBundleInto(doc: Document, container: HTMLElement, bundle: DictLookupBundle, maxSources = 2): void {
+export function renderBundleInto(
+  doc: Document,
+  container: HTMLElement,
+  bundle: DictLookupBundle,
+  maxSources = 2,
+  language: LanguagePreference = "en",
+): void {
+  const messages = getMessages(language);
   const okSources = bundle.sources.filter((s) => s.ok && !!s.result);
   const shown = okSources.slice(0, Math.max(1, maxSources));
   if (shown.length === 0) {
-    container.appendChild(span(doc, undefined, "在线词典未查询到结果"));
+    container.appendChild(span(doc, undefined, messages.dictionaries.noLookupResults));
     return;
   }
   for (const src of shown) {
@@ -90,10 +99,10 @@ export function renderBundleInto(doc: Document, container: HTMLElement, bundle: 
     const section = div(doc, "p2a-dict-src");
 
     const head = div(doc, "p2a-dict-head");
-    head.appendChild(span(doc, "p2a-src-badge", src.name));
+    head.appendChild(span(doc, "p2a-src-badge", messages.dictionaries.names[src.id]));
     if (src.url) head.appendChild(span(doc, "p2a-src-url", src.url));
     section.appendChild(head);
-    if (r.phonetic) section.appendChild(div(doc, "p2a-phon", `音标 ${r.phonetic}`));
+    if (r.phonetic) section.appendChild(div(doc, "p2a-phon", `${messages.dictionaries.pronunciation} ${r.phonetic}`));
 
     // 释义：例句已跟随各自释义
     for (const def of r.definitions) renderDefinition(doc, section, def, r.word);
@@ -103,17 +112,19 @@ export function renderBundleInto(doc: Document, container: HTMLElement, bundle: 
     r.definitions.forEach((d) => { if (d.example) used.add(d.example.trim().toLowerCase()); });
     const rest = (r.examples || []).filter((ex) => !ex.en || !used.has(ex.en.trim().toLowerCase()));
     if (rest.length) {
-      const label = div(doc, "p2a-more", "更多例句");
+      const label = div(doc, "p2a-more", messages.dictionaries.moreExamples);
       section.appendChild(label);
       addSentenceList(doc, section, rest, r.word);
     }
     // 附加信息（词形/搭配等）
-    for (const extra of (r.extras || []).slice(0, 3)) section.appendChild(div(doc, "p2a-extra", extra));
+    for (const extra of (r.extras || []).slice(0, 3)) {
+      section.appendChild(div(doc, "p2a-extra", localizeExtraText(extra, messages)));
+    }
     container.appendChild(section);
   }
   const hidden = okSources.length - shown.length;
   if (hidden > 0) {
-    const names = okSources.slice(shown.length).map((s) => s.name);
-    container.appendChild(div(doc, "p2a-more", `…（另有 ${names.join("、")} 收录该词，弹窗未展开）`));
+    const names = okSources.slice(shown.length).map((s) => messages.dictionaries.names[s.id]);
+    container.appendChild(div(doc, "p2a-more", messages.dictionaries.hiddenSources(formatList(names, language))));
   }
 }
