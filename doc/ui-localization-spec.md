@@ -1,7 +1,7 @@
 # Multilingual UI Specification
 
 Status: Implemented
-Initial locales: English, Japanese, Simplified Chinese  
+Initial locales: English, Japanese, Simplified Chinese
 Default locale: English
 
 ## 1. Purpose
@@ -380,4 +380,3 @@ Manual review must cover terminology, punctuation, natural phrasing, Japanese an
 7. Localize plugin-generated Anki labels while preserving source content.
 8. Update tests and documentation.
 9. Run catalog-completeness, layout, settings-compatibility, and mocked-service tests.
-
