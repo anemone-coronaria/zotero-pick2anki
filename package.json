@@ -10,10 +10,10 @@
     "addonInstance": "ZoteroPick2anki",
     "prefsPrefix": "extensions.zotero.zoteropick2anki"
   },
-  "homepage": "https://github.com/soyami/zotero-pick2anki",
+  "homepage": "https://github.com/anemone-coronaria/zotero-pick2anki",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/soyami/zotero-pick2anki.git"
+    "url": "git+https://github.com/anemone-coronaria/zotero-pick2anki.git"
   },
   "author": "soyami",
   "license": "MIT",

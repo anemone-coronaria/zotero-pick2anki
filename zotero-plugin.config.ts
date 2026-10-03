@@ -14,8 +14,8 @@ export default defineConfig({
   xpiName: "zotero-pick2anki",
   // 更新清单地址：Zotero 会定期查它（用于推送新版本、以及不重发 .xpi 就放宽版本兼容区间）。
   // manifest 里必须有 update_url（空串会被 Zotero 判为无效插件）；仓库地址为：
-  // https://github.com/soyami/zotero-pick2anki
-  updateURL: "https://github.com/soyami/zotero-pick2anki/releases/download/release/update.json",
+  // https://github.com/anemone-coronaria/zotero-pick2anki
+  updateURL: "https://github.com/anemone-coronaria/zotero-pick2anki/releases/download/release/update.json",
   // .xpi 的下载地址模板：由它写进 update.json 的 update_link。
   // 注意：scaffold 的默认模板在版本号前加了 "v"（.../download/v{{version}}/...），
   // 本项目的标签用纯数字（如 1.0.7），所以这里显式改成不带 v 的模板。

@@ -46,7 +46,7 @@ zotero-pick2anki 只做这一条链路：**划词 → 聚合释义 → 写卡**�
 
 ### 方式一：安装 .xpi
 
-1. 从[上游最新发布](https://github.com/soyami/zotero-pick2anki/releases/latest)下载 `zotero-pick2anki.xpi`（安装的是上游版本；本分支可按下面步骤从源码构建）（本项目构建产物在 `.scaffold/build/zotero-pick2anki.xpi`）
+1. 从[本分支最新发布](https://github.com/anemone-coronaria/zotero-pick2anki/releases/latest)下载 `zotero-pick2anki.xpi`，或按下面步骤从源码构建（本项目构建产物在 `.scaffold/build/zotero-pick2anki.xpi`）
 2. Zotero → **工具 → 插件**（Zotero 10 里叫「插件」，7–9 里叫「附加组件」）
 3. 右上角齿轮 → **Install Plugin From File…**（从文件安装插件），选择该 .xpi
 4. 重启 Zotero → 工具 → 插件 里应出现 **Pick2anki**
@@ -78,7 +78,7 @@ ZOTERO_PLUGIN_DATA_DIR=                # 可选：指定测试用数据目录
 
 仓库：<https://github.com/anemone-coronaria/zotero-pick2anki>
 
-上游项目：[soyami/zotero-pick2anki](https://github.com/soyami/zotero-pick2anki)。当前构建配置的更新清单仍指向上游发布地址。
+上游项目：[soyami/zotero-pick2anki](https://github.com/soyami/zotero-pick2anki)。本分支的构建配置使用自己的发布更新清单。
 
 **日常发版的全部操作就三步**（其余由 CI 完成）：
 
@@ -193,7 +193,7 @@ Zotero 专属项（Obsidian 版没有，均有默认值，不影响原有键）�
 3. **词典源反爬**：柯林斯/牛津/剑桥官网随时可能改版或返回 403（自测里柯林斯就返回了 403）。失败只影响该源。
 4. **只处理英文单词/短语**：中文、整段、超过 5 个词或 60 字符不触发（与 Obsidian 版一致）。
 5. **需要 Zotero 7 及以上**（`strict_min_version: 7.0`，`strict_max_version: 10.9.9`）；安装前请确认版本落在区间内，否则 Zotero 会判定不兼容。
-6. **`update_url` 与发布**：Zotero 强制要求 manifest 里有 `update_url`，本项目的更新清单地址指向 `https://github.com/soyami/zotero-pick2anki/releases/download/release/update.json`。在发布 `update.json` 之前，Zotero 的更新检查会 404（不影响使用，只是查不到新版本）；发布方式见[发布](#发布)。
+6. **`update_url` 与发布**：Zotero 强制要求 manifest 里有 `update_url`，本项目的更新清单地址指向 `https://github.com/anemone-coronaria/zotero-pick2anki/releases/download/release/update.json`。在发布 `update.json` 之前，Zotero 的更新检查会 404（不影响使用，只是查不到新版本）；发布方式见[发布](#发布)。
 7. **AnkiConnect 端口/CORS**：默认 `127.0.0.1:8765`。若修改过 AnkiConnect 的 `webCorsOriginList` 且出现被拒提示，把 `*` 或来源加进白名单（Zotero 的特权请求通常不带 `Origin`，正常情况下无需改动）。
 
 ## 隐私与网络行为
@@ -203,7 +203,7 @@ Zotero 插件对本机有完全权限，所以这里把本插件的联网行为�
 - **查词时**：向有道、必应、剑桥、牛津高阶、柯林斯五个词典站发普通 HTTPS 请求（读词条页/接口），发音音频从对应 CDN 直接下载 mp3。请求只带一个常见浏览器 User-Agent，不携带你的任何身份信息或文献内容。
 - **写卡时**：默认只连本机 `127.0.0.1:8765`（AnkiConnect），不经过任何第三方服务器。
 - **不做的**：没有账号体系、没有 API Key、没有遥测或统计上报；不收集、不上传你的文献、标注或阅读行为。只有你请求写卡时（包括启用自动写卡后），「选中词 + 所在句子 + 词典释义」才会写进**你本地的 Anki**。
-- **唯一的主动联网检查**：Zotero 会按 manifest 里的 `update_url` 定期拉取配置的上游 Release 中的 `update.json` 检查更新（可在 Zotero 偏好里关闭插件自动更新）。
+- **唯一的主动联网检查**：Zotero 会按 manifest 里的 `update_url` 定期拉取本分支 Release 中的 `update.json` 检查更新（可在 Zotero 偏好里关闭插件自动更新）。
 
 - **可选语音合成**：若启用 Edge TTS 兜底且之前的音频来源均失败，会把选中的单词或短语发送给微软语音服务。
 

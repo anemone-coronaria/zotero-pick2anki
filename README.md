@@ -45,7 +45,7 @@ Both plugins append their own panels to Zotero's selection popup through the off
 
 ### Option 1: Install an .xpi
 
-1. Download `zotero-pick2anki.xpi` from the [latest upstream release](https://github.com/soyami/zotero-pick2anki/releases/latest). This installs the upstream version; to use this branch, build from source below. The local build output is `.scaffold/build/zotero-pick2anki.xpi`.
+1. Download `zotero-pick2anki.xpi` from [this fork's latest release](https://github.com/anemone-coronaria/zotero-pick2anki/releases/latest), or build from source below. The local build output is `.scaffold/build/zotero-pick2anki.xpi`.
 2. In Zotero, open **Tools → Plugins** (called “Add-ons” in Zotero 7–9).
 3. Open the gear menu and choose **Install Plugin From File…**, then select the `.xpi`.
 4. Restart Zotero. **Pick2anki** should appear under Tools → Plugins.
@@ -77,7 +77,7 @@ ZOTERO_PLUGIN_DATA_DIR=                # Optional: test data directory
 
 Repository: <https://github.com/anemone-coronaria/zotero-pick2anki>
 
-Upstream project: [soyami/zotero-pick2anki](https://github.com/soyami/zotero-pick2anki). The current build configuration still points to the upstream update-manifest URL.
+Upstream project: [soyami/zotero-pick2anki](https://github.com/soyami/zotero-pick2anki). This fork's build configuration uses its own release update manifest.
 
 **A routine release has three steps**; CI handles the rest:
 
@@ -194,7 +194,7 @@ Matching setting keys allow migration of dictionary order and enabled sources, A
 3. **Dictionary sites may block scraping.** Collins, Oxford, and Cambridge may change their markup or return HTTP 403. Failure affects only that source.
 4. **Only English words and phrases are supported.** Chinese text, paragraphs, and selections longer than five words or 60 characters do not trigger lookup, matching the Obsidian version.
 5. **Zotero 7 or later is required**, with the manifest declaring `strict_min_version: 7.0` and `strict_max_version: 10.9.9`. Versions outside that range may reject the plugin as incompatible.
-6. **Update manifest and releases.** The configured `update_url` is `https://github.com/soyami/zotero-pick2anki/releases/download/release/update.json` (upstream). If `update.json` is not published there, update checks return 404 without affecting normal use. See [Releases](#releases) for the publishing workflow.
+6. **Update manifest and releases.** The configured `update_url` is `https://github.com/anemone-coronaria/zotero-pick2anki/releases/download/release/update.json`. If `update.json` is not published there, update checks return 404 without affecting normal use. See [Releases](#releases) for the publishing workflow.
 7. **AnkiConnect port/CORS.** The default endpoint is `127.0.0.1:8765`. If a customized `webCorsOriginList` causes rejected requests, add the appropriate origin or `*` to the allowlist. Zotero's privileged requests normally omit `Origin`, so changes are usually unnecessary.
 
 ## Privacy and network behavior
