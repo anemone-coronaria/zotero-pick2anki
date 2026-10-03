@@ -2,7 +2,7 @@
 
 [English](README.md) | 简体中文
 
-> **Zotero 划词词典插件**：在内置 PDF / EPub 阅读器里选中英文单词或短语 → 5 个在线词典源聚合释义 → 一键通过 AnkiConnect 写入 Anki 生词卡（原句就是你在文献里选中的那句话）。
+> **Zotero 划词词典插件**：在内置 PDF / EPub 阅读器里选中英文单词或短语 → 6 个在线词典源聚合释义 → 一键通过 AnkiConnect 写入 Anki 生词卡（原句就是你在文献里选中的那句话）。
 
 
 ---
@@ -22,7 +22,7 @@ zotero-pick2anki 只做这一条链路：**划词 → 聚合释义 → 写卡**�
 | 面向对象 | 整句 / 整段 | 英文单词、短语 |
 | 输出 | 译文（DeepL / 有道 / GPT …） | 多源词典聚合释义 + 音标 + 例句 |
 | 落点 | 阅读器内的译文面板 | **Anki 生词卡**（AnkiConnect 直连） |
-| 需要 Key | 多数服务需要 | **不需要**（5 个公开词典源） |
+| 需要 Key | 多数服务需要 | **不需要**（6 个公开词典源） |
 | 定位 | 读懂**这一段** | 记住**这个词** |
 
 两者都在 Zotero 划词弹窗里追加自己的面板（同一种官方 API：`Zotero.Reader` 的 `renderTextSelectionPopup` 事件），所以可以同时启用：它显示译文，本插件显示词典释义与 ➕ Anki 按钮，互不干扰。
@@ -33,7 +33,7 @@ zotero-pick2anki 只做这一条链路：**划词 → 聚合释义 → 写卡**�
 
 | 功能 | 说明 |
 |---|---|
-| **多源词典聚合** | 划选英文单词/短语即弹出聚合释义，内置 5 个源：有道（含柯林斯英汉双解授权数据）、柯林斯英汉双解官网、牛津高阶学习者词典、必应（英汉）、剑桥。源可启停、可拖拽排序；弹窗只完整展开排在最前且可用的 2 个源，避免刷屏 |
+| **多源词典聚合** | 划选英文单词/短语即弹出聚合释义，内置 6 个源：有道（含柯林斯英汉双解授权数据）、Weblio（英日）、柯林斯英汉双解官网、牛津高阶学习者词典、必应（英汉）、剑桥。源可启停、可拖拽排序；弹窗只完整展开排在最前且可用的 2 个源，避免刷屏 |
 | **只查英文单词/短语** | 复用 Pick2anki 的判断：中文、整段文字、超过 5 个词或 60 字符的选区不触发 |
 | **Anki 一键写卡** | 通过 AnkiConnect 直连本地 Anki（默认 `127.0.0.1:8765`），无需额外插件。写入指定牌组与笔记类型，弹窗按钮实时反馈：写入中 → ✔ 成功 / ↺ 已存在 |
 | **字段映射（9 种固定内容 → 你的模板字段）** | 单词/词组、原句、音标、单一释义、全部释义、例句、额外信息、音频、来源。读取你笔记类型的字段后用下拉逐一映射；留空 = 不写入；同一字段被多个内容指向时自动合并 |
@@ -122,7 +122,7 @@ npm run build          # 想本地手动构建：产出 .scaffold/build/zotero-p
 
 设置 → Pick2anki → 在线词典查词：可拖拽调整源顺序、行尾开关停用某个源，点「试查 hello」验证网络连通。
 
-> 柯林斯/牛津/剑桥官网存在反爬或改版，失败时插件会自动跳过该源并继续其它源（自测中就有源返回 403）。有道、必应最稳定。
+> Weblio/柯林斯/牛津/剑桥官网存在反爬或改版，失败时插件会自动跳过该源并继续其它源（自测中就有源返回 403）。有道、必应最稳定。
 
 ### 2. 写入 Anki
 
@@ -162,7 +162,7 @@ npm run build          # 想本地手动构建：产出 .scaffold/build/zotero-p
 | 卡片标签语言 | `cardLabelLanguage` | `ui` | Pick2anki 自行添加的卡片标签默认跟随界面，也可固定为任一受支持语言；不会翻译词典和文献内容 |
 | 触发模式 | `triggerMode` | `direct` | `direct` 直接选中即查词；`ctrl` 弹窗内手动点「查词」 |
 | 触发延迟 | `triggerDebounce` | `500` | 保留位（与 Obsidian 版 schema 对齐；Zotero 由事件驱动，无需防抖） |
-| 词典源与顺序 | `onlineDictSources` | 有道→必应→剑桥→柯林斯→牛津 | 可停用、可拖拽排序 |
+| 词典源与顺序 | `onlineDictSources` | 有道→Weblio→必应→剑桥→柯林斯→牛津 | 可停用、可拖拽排序 |
 | 启用 Anki 写卡 | `ankiEnabled` | `false` | |
 | 本地桥接地址 | `ankiConnectUrl` | `http://127.0.0.1:8765` | AnkiConnect 地址 |
 | 目标牌组 / 模板 | `ankiDeck` / `ankiNoteType` | 空 | 从 Anki 读取后下拉选择 |
@@ -194,7 +194,7 @@ Zotero 专属项（Obsidian 版没有，均有默认值，不影响原有键）�
 
 1. **Edge TTS 在 Zotero 里属于“尽力而为”**：浏览器的 WebSocket 不能自定义 `Cookie` / `Origin` / `User-Agent`，而微软的 Edge TTS 接口要求带 MUID cookie。本插件改用 Cookie 服务注入 MUID（[`src/modules/edge-tts.ts`](src/modules/edge-tts.ts) 的 `ensureMuidCookie`），但若服务端仍因缺少 Origin 而拒绝，就会失败。因此发音链是 **词典 mp3 → 有道发音接口（HTTP，8s 超时）→ Edge TTS（默认关闭，可在设置里开启）**，由 [`anki.ts`](src/modules/anki.ts) 的 `storeAudio` 依次尝试，任一成功即写入卡片；全部失败只是跳过「音频」字段，不影响写卡。
 2. **原句扩写是启发式的**：PDF 文本层的拼接方式因版面而异，插件会校验「扩写出的句子必须真的包含该词且长度合理」，不满足就回退成**你选中的文本本身**。EPUB 的 DOM 差异较大，默认更容易回退。可在设置里关闭「原句扩写」。
-3. **词典源反爬**：柯林斯/牛津/剑桥官网随时可能改版或返回 403（自测里柯林斯就返回了 403）。失败只影响该源。
+3. **词典源反爬**：Weblio/柯林斯/牛津/剑桥官网随时可能改版或返回 403（自测里柯林斯就返回了 403）。失败只影响该源。
 4. **只处理英文单词/短语**：中文、整段、超过 5 个词或 60 字符不触发（与 Obsidian 版一致）。
 5. **需要 Zotero 7 及以上**（`strict_min_version: 7.0`，`strict_max_version: 10.9.9`）；安装前请确认版本落在区间内，否则 Zotero 会判定不兼容。
 6. **`update_url` 与发布**：Zotero 强制要求 manifest 里有 `update_url`，本项目的更新清单地址指向 `https://github.com/anemone-coronaria/zotero-pick2anki/releases/download/release/update.json`。在发布 `update.json` 之前，Zotero 的更新检查会 404（不影响使用，只是查不到新版本）；发布方式见[发布](#发布)。
@@ -204,7 +204,7 @@ Zotero 专属项（Obsidian 版没有，均有默认值，不影响原有键）�
 
 Zotero 插件对本机有完全权限，所以这里把本插件的联网行为列清楚：
 
-- **查词时**：向有道、必应、剑桥、牛津高阶、柯林斯五个词典站发普通 HTTPS 请求（读词条页/接口），发音音频从对应 CDN 直接下载 mp3。请求只带一个常见浏览器 User-Agent，不携带你的任何身份信息或文献内容。
+- **查词时**：向有道、Weblio、必应、剑桥、牛津高阶、柯林斯六个词典站发普通 HTTPS 请求（读词条页/接口），发音音频从对应 CDN 直接下载 mp3。请求只带一个常见浏览器 User-Agent，不携带你的任何身份信息或文献内容。
 - **写卡时**：默认只连本机 `127.0.0.1:8765`（AnkiConnect），不经过任何第三方服务器。
 - **不做的**：没有账号体系、没有 API Key、没有遥测或统计上报；不收集、不上传你的文献、标注或阅读行为。只有你请求写卡时（包括启用自动写卡后），「选中词 + 所在句子 + 词典释义」才会写进**你本地的 Anki**。
 - **唯一的主动联网检查**：Zotero 会按 manifest 里的 `update_url` 定期拉取本分支 Release 中的 `update.json` 检查更新（可在 Zotero 偏好里关闭插件自动更新）。
@@ -215,8 +215,8 @@ Zotero 插件对本机有完全权限，所以这里把本插件的联网行为�
 
 MIT（[`LICENSE`](LICENSE) 为标准 MIT 正文）。本项目是 MIT 许可的 Obsidian 插件 **Pick2anki** 的衍生物：其原始许可证文本见 [`LICENSE-Pick2anki`](LICENSE-Pick2anki)，衍生关系与第三方致谢见下面列表。
 
-- **[Pick2anki](https://github.com/soyami/pick2anki)** — MIT © soyami。本项目的词典适配器（有道/柯林斯/牛津/必应/剑桥）、统一词典 schema、AnkiConnect 客户端、Anki 字段 HTML 生成、Edge TTS 协议实现、弹窗与设置页设计均移植自它，**没有它就沒有本项目**。
+- **[Pick2anki](https://github.com/soyami/pick2anki)** — MIT © soyami。本项目原有的五个词典适配器（有道/柯林斯/牛津/必应/剑桥）、统一词典 schema、AnkiConnect 客户端、Anki 字段 HTML 生成、Edge TTS 协议实现、弹窗与设置页设计均移植自它；Weblio 适配器由本 Zotero 插件新增。**没有它就沒有本项目**。
 - **[zotero-plugin-template](https://github.com/windingwind/zotero-plugin-template)** — AGPL-3.0-or-later。本项目沿用了它的项目组织结构、`zotero-plugin.config.ts` 构建配置写法（`zotero-plugin-scaffold`）与 `addon/manifest.json` / `bootstrap.js` 骨架（该骨架本身来自 Zotero 官方的 [Make It Red](https://github.com/zotero/make-it-red) 示例与 [Zotero 7 开发文档](https://www.zotero.org/support/dev/zotero_7_for_developers)），未复制其中的业务代码。
 - **[zotero-pdf-translate](https://github.com/windingwind/zotero-pdf-translate)** — AGPL-3.0-or-later。仅参考其公开的架构思路（在 Zotero 官方划词弹窗里追加自己的面板、给面板内控件做事件隔离），**未复制任何代码**；两者的定位互补，详见[上文对比表](#与-zotero-pdf-translate-的关系互补可共存)。
 - **[AnkiConnect](https://foosoft.net/projects/anki-connect/)** — Anki 的本地 JSON-RPC 桥，写卡的传输层。
-- 词典数据版权归各来源网站所有（有道、柯林斯、牛津、必应、剑桥），本插件仅做个人学习用途的页面解析，请遵守各站条款。
+- 词典数据版权归各来源网站所有（有道、Weblio、柯林斯、牛津、必应、剑桥），本插件仅做个人学习用途的页面解析，请遵守各站条款。

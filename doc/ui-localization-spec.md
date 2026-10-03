@@ -228,6 +228,7 @@ Settings and lookup results store stable dictionary IDs:
 ```ts
 type DictionaryId =
   | "youdao"
+  | "weblio"
   | "collins"
   | "oxford"
   | "bing"
@@ -239,6 +240,7 @@ Resolve display names from the active catalog at render time. Never persist tran
 | ID | English | Japanese | Simplified Chinese |
 |---|---|---|---|
 | `youdao` | Youdao Dictionary | 有道辞書 | 有道词典 |
+| `weblio` | Weblio Dictionary (English–Japanese) | Weblio英和・和英辞典 | Weblio 词典（英日） |
 | `collins` | Collins English–Chinese | コリンズ英中辞典 | 柯林斯英汉词典 |
 | `oxford` | Oxford Advanced Learner's Dictionary | オックスフォード現代英英辞典 | 牛津高阶学习词典 |
 | `bing` | Bing Dictionary | Bing 辞書 | 必应词典 |

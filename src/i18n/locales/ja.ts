@@ -24,6 +24,7 @@ export const ja: Messages = {
   dictionaries: {
     names: {
       youdao: "有道辞書（コリンズ英中辞典を含む）",
+      weblio: "Weblio英和・和英辞典",
       collins: "コリンズ英中辞典",
       oxford: "オックスフォード現代英英辞典",
       bing: "Bing 辞書（英中）",

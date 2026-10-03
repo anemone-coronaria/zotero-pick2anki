@@ -7,7 +7,7 @@ pref("triggerMode", "direct");          // direct | ctrl
 pref("uiLanguage", "en");              // en | ja | zh-Hans | system
 pref("cardLabelLanguage", "ui");       // ui | en | ja | zh-Hans
 pref("triggerDebounce", 500);           // 保留位：与 Obsidian 版 schema 对齐
-pref("onlineDictSources", "[\"youdao\",\"bing\",\"cambridge\",\"collins\",\"oxford\"]");
+pref("onlineDictSources", "[\"youdao\",\"weblio\",\"bing\",\"cambridge\",\"collins\",\"oxford\"]");
 pref("ankiEnabled", false);
 pref("ankiConnectUrl", "http://127.0.0.1:8765");
 pref("ankiDeck", "");

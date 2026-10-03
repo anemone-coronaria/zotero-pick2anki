@@ -46,14 +46,16 @@ function defBody(def: DictDefinition, word: string): string {
   const meaning = def.meaning || "";
   let content = "";
   if (zh) {
-    if (meaning && !/[\u4e00-\u9fff]/.test(meaning)) {
+    if (meaning && !/[\u3040-\u30ff\u3400-\u9fff]/.test(meaning)) {
       content += `<span>${hlHtml(word, meaning)}</span>`;
     } else if (meaning) {
       content += `<span style="color:#0d47a1">${escHtml(meaning)}</span>`;
     }
     content += `<span style="color:#0d47a1">${escHtml(zh)}</span>`;
   } else if (meaning) {
-    content += `<span>${hlHtml(word, meaning)}</span>`;
+    content += /[\u3040-\u30ff\u3400-\u9fff]/.test(meaning)
+      ? `<span style="color:#0d47a1">${escHtml(meaning)}</span>`
+      : `<span>${hlHtml(word, meaning)}</span>`;
   }
   const badge = def.pos
     ? `<span style="${POS_BADGE}">${escHtml(posPretty(def.pos).toLowerCase())}</span>`

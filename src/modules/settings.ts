@@ -1,12 +1,13 @@
 import type { CardLabelLanguage, LanguagePreference } from "../i18n";
 
-// ============ 在线词典（有道 / 柯林斯英汉双解官网 / 牛津高阶 / 必应 / 剑桥） ============
-export type OnlineDictSource = "youdao" | "collins" | "oxford" | "bing" | "cambridge";
+// ============ 在线词典（有道 / Weblio / 柯林斯英汉双解官网 / 牛津高阶 / 必应 / 剑桥） ============
+export type OnlineDictSource = "youdao" | "weblio" | "collins" | "oxford" | "bing" | "cambridge";
 
-export const ONLINE_DICT_SOURCES: OnlineDictSource[] = ["youdao", "collins", "oxford", "bing", "cambridge"];
+export const ONLINE_DICT_SOURCES: OnlineDictSource[] = ["youdao", "weblio", "collins", "oxford", "bing", "cambridge"];
 
 export const ONLINE_DICT_NAMES: Record<OnlineDictSource, string> = {
   youdao: "Youdao Dictionary",
+  weblio: "Weblio Dictionary (English–Japanese)",
   collins: "Collins English–Chinese",
   oxford: "Oxford Advanced Learner's Dictionary",
   bing: "Bing Dictionary",
@@ -67,7 +68,7 @@ export const DEFAULT_SETTINGS: Pick2ankiSettings = {
   cardLabelLanguage: "ui",
   triggerMode: "direct",
   triggerDebounce: 500,
-  onlineDictSources: ["youdao", "bing", "cambridge", "collins", "oxford"],
+  onlineDictSources: ["youdao", "weblio", "bing", "cambridge", "collins", "oxford"],
   ankiEnabled: false,
   ankiConnectUrl: "http://127.0.0.1:8765",
   ankiDeck: "",

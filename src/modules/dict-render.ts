@@ -13,7 +13,7 @@ import { formatList, getMessages } from "../i18n";
 import type { LanguagePreference } from "../i18n";
 
 function hasCjk(s: string): boolean {
-  return /[\u4e00-\u9fff]/.test(s);
+  return /[\u3040-\u30ff\u3400-\u9fff]/.test(s);
 }
 
 /** 把文本分段塞入 parent：命中 word（含常见屈折变化）的片段加粗（大小写不敏感） */
@@ -67,9 +67,13 @@ function renderDefinition(doc: Document, container: HTMLElement, def: DictDefini
     }
     tran.appendChild(span(doc, "p2a-chn-tran", zh));
   } else if (meaning) {
-    const eng = span(doc, "p2a-eng-tran");
-    fillHighlighted(doc, eng, meaning, word);
-    tran.appendChild(eng);
+    if (hasCjk(meaning)) {
+      tran.appendChild(span(doc, "p2a-chn-tran", meaning));
+    } else {
+      const eng = span(doc, "p2a-eng-tran");
+      fillHighlighted(doc, eng, meaning, word);
+      tran.appendChild(eng);
+    }
   }
   row.appendChild(tran);
   // 例句紧跟对应释义

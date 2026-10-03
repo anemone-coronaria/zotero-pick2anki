@@ -1,11 +1,11 @@
 // ============ 词典查词：适配器注册表 + 统一渲染/写卡辅助 ============
-// 架构：一个源 = 一个独立适配器脚本（youdao-dict.ts / bing-dict.ts / cambridge-dict.ts /
-// collins-dict.ts / oxford-dict.ts），只做“抓取 → 统一 DictResult”。
+// 架构：一个源 = 一个独立适配器脚本，只做“抓取 → 统一 DictResult”。
 // 本文件负责：注册适配器、按用户排序并发查词、把统一结果渲染为弹窗文本、
 // 以及为 Anki 写卡提供字段内容提取（bundle* 系列）。任何第三方爬虫只要产出统一
 // DictResult（至少一条 definition），即可通过 lookupWordOnline/注册表接入。
 import type { DictAdapter, DictAudioUrl, DictDefinition, DictExample, DictLookupBundle, DictResult, DictSourceId } from "./dict-types";
 import { youdaoAdapter } from "./youdao-dict";
+import { weblioAdapter } from "./weblio-dict";
 import { bingAdapter } from "./bing-dict";
 import { cambridgeAdapter } from "./cambridge-dict";
 import { collinsAdapter } from "./collins-dict";
@@ -21,6 +21,7 @@ export type { DictAdapter, DictAudioUrl };
 /** 全部可用适配器（固定编译期注册；新增源在此追加并在设置里可勾选） */
 export const DICT_ADAPTERS: DictAdapter[] = [
   youdaoAdapter,
+  weblioAdapter,
   collinsAdapter,
   oxfordAdapter,
   bingAdapter,

@@ -9,6 +9,7 @@ import { localizeExtraText } from "../src/modules/dict-utils";
 import { renderPrefsPane } from "../src/modules/prefs-ui";
 import { getSettings } from "../src/modules/settings-store";
 import { DEFAULT_SETTINGS } from "../src/modules/settings";
+import { parseWeblioHtml } from "../src/modules/weblio-dict";
 
 assert.equal(resolveLocale("en"), "en");
 assert.equal(resolveLocale("ja"), "ja");
@@ -96,6 +97,31 @@ assert.ok(!englishCard.includes("<script>"));
 assert.ok(englishCard.includes("Youdao Dictionary"));
 assert.ok(japaneseCard.includes("有道辞書"));
 
+const parserDom = new JSDOM("");
+(globalThis as unknown as { DOMParser: unknown }).DOMParser = parserDom.window.DOMParser;
+const weblioResult = parseWeblioHtml("hello", `
+  <div id="summary">
+    <span class="content-explanation ej">こんにちは、もしもし</span>
+    <span class="phoneticEjjeDesc">həlóʊ</span><span>（米国英語）</span>
+    <span class="phoneticEjjeDesc">həlˈəʊ</span><span>（英国英語）</span>
+    <audio class="contentAudio"><source src="https://cdn.example.test/hello.mp3"></audio>
+  </div>
+  <div id="hideDictPrsKENEJ"><div class="Kejje">
+    <div class="level0"><div class="KnenjSub">間投詞</div></div>
+    <div class="level0"><p class="lvlB">やあ、こんにちは</p></div>
+    <table class="KejjeYr"><tr><td><div class="KejjeYrLn">
+      <span class="KejjeYrEn">Hello there!</span><span class="KejjeYrJp">こんにちは！</span>
+    </div></td></tr></table>
+  </div></div>
+`);
+assert.ok(weblioResult);
+assert.equal(weblioResult.definitions[0].pos, "interjection");
+assert.equal(weblioResult.definitions[0].meaning, "やあ、こんにちは");
+assert.equal(weblioResult.definitions[0].example, "Hello there!");
+assert.equal(weblioResult.definitions[0].exampleZh, "こんにちは！");
+assert.match(weblioResult.phonetic || "", /UK.*həlˈəʊ.*US.*həlóʊ/);
+assert.equal(weblioResult.audioUrl, "https://cdn.example.test/hello.mp3");
+
 const prefs = new Map<string, unknown>();
 (globalThis as unknown as { Zotero: unknown }).Zotero = {
   locale: "en-AU",
@@ -111,12 +137,12 @@ const host = dom.window.document.querySelector("#host") as HTMLElement;
 renderPrefsPane(dom.window.document, host);
 assert.match(host.textContent || "", /Interface language/);
 assert.equal(host.querySelectorAll(".p2a-src-list").length, 1);
-assert.equal(host.querySelectorAll(".p2a-src-list .p2a-src-row").length, 5);
+assert.equal(host.querySelectorAll(".p2a-src-list .p2a-src-row").length, 6);
 const firstDictionaryToggle = host.querySelector(".p2a-src-row input[type='checkbox']") as HTMLInputElement;
 firstDictionaryToggle.checked = false;
 firstDictionaryToggle.dispatchEvent(new dom.window.Event("change", { bubbles: true }));
-assert.equal(getSettings().onlineDictSources.length, 4);
-assert.equal(host.querySelectorAll(".p2a-src-list .p2a-src-row").length, 5);
+assert.equal(getSettings().onlineDictSources.length, 5);
+assert.equal(host.querySelectorAll(".p2a-src-list .p2a-src-row").length, 6);
 assert.equal(host.querySelectorAll(".p2a-src-list .p2a-src-row input:not(:checked)").length, 1);
 assert.ok(!(host.textContent || "").includes("Disabled dictionaries"));
 const disabledDictionaryToggle = host.querySelector(

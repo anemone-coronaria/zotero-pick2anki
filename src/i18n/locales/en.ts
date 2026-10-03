@@ -24,6 +24,7 @@ export const en: Messages = {
   dictionaries: {
     names: {
       youdao: "Youdao Dictionary (including Collins English–Chinese)",
+      weblio: "Weblio Dictionary (English–Japanese)",
       collins: "Collins English–Chinese",
       oxford: "Oxford Advanced Learner's Dictionary",
       bing: "Bing Dictionary (English–Chinese)",

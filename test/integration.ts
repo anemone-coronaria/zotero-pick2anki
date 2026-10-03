@@ -2,7 +2,7 @@
 // 覆盖范围：
 //   1) sha256（Edge TTS 鉴权 / 音频文件名哈希依赖）
 //   2) canUseOnlineDict 触发判断（中文/整段/超长不触发）
-//   3) 5 个词典源的在线查词（真实网络）
+//   3) 6 个词典源的在线查词（真实网络）
 //   4) 设置读写往返（Zotero 偏好）、Obsidian data.json 导入
 //   5) 原句提取（含"文本层在内层 iframe"的真实 PDF 结构）
 //   6) AnkiConnect：连接、读取牌组/模板/字段 → 写卡（含 9 种内容源映射 + 音频入库）→ 校验 → 清理
@@ -118,7 +118,7 @@ async function main(): Promise<void> {
       canUseOnlineDict(text) === expected);
   }
 
-  console.log("\n=== 3. 在线词典（真实网络，5 源） ===");
+  console.log("\n=== 3. 在线词典（真实网络，6 源） ===");
   info("适配器：" + DICT_ADAPTERS.map((a) => `${a.id}=${a.name}`).join(" | "));
   const bundle = await lookupWordOnline("hello", DEFAULT_SETTINGS.onlineDictSources);
   let okSources = 0;
@@ -133,7 +133,8 @@ async function main(): Promise<void> {
       info(`${s.name}：❌ ${s.error || "无结果"}`);
     }
   }
-  check("至少 2 个词典源返回结果（网络可用性判断）", okSources >= 2, `成功 ${okSources}/5`);
+  check("至少 2 个词典源返回结果（网络可用性判断）", okSources >= 2,
+    `成功 ${okSources}/${DEFAULT_SETTINGS.onlineDictSources.length}`);
   check("聚合结果含内容（dictHasContent）", dictHasContent(bundle));
 
   const rare = await lookupWordOnline("serendipity", ["youdao", "bing"]);
@@ -267,7 +268,7 @@ async function main(): Promise<void> {
   check("单一释义 HTML（释义行 + 词性徽章，内联样式）",
     htmlChecks[0][1].includes(DEF_ROW) && htmlChecks[0][1].includes(POS_BADGE));
   check("全部释义 HTML（多源带源名标题 + 释义行）",
-    htmlChecks[1][1].includes(DEF_ROW) && /有道词典|柯林斯|牛津|必应|剑桥/.test(htmlChecks[1][1]));
+    htmlChecks[1][1].includes(DEF_ROW) && /有道词典|Weblio|柯林斯|牛津|必应|剑桥/.test(htmlChecks[1][1]));
   check("全部释义把命中词加粗（<b>hello</b>）", /<b>hello<\/b>/i.test(htmlChecks[1][1]));
   check("例句 HTML（浅蓝方块列表）", htmlChecks[2][1] === "" || htmlChecks[2][1].includes(SENTS_UL));
   check("额外信息 HTML（词形/搭配）", htmlChecks[3][1] === "" || htmlChecks[3][1].includes("color:#666"),

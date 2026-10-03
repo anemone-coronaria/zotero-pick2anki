@@ -2,7 +2,7 @@
 
 English | [简体中文](README-cn.md)
 
-> **A dictionary plugin for Zotero**: select an English word or phrase in the built-in PDF/EPUB reader → get definitions from five online dictionaries → save an Anki vocabulary card with the sentence where you encountered it.
+> **A dictionary plugin for Zotero**: select an English word or phrase in the built-in PDF/EPUB reader → get definitions from six online dictionaries → save an Anki vocabulary card with the sentence where you encountered it.
 
 ## What problem does it solve?
 
@@ -21,7 +21,7 @@ zotero-pick2anki focuses on **select → look up → save a card**. It does not 
 | Lookup target | Sentences and paragraphs | English words and phrases |
 | Output | Translations (DeepL, Youdao, GPT, etc.) | Aggregated definitions, phonetics, and examples |
 | Destination | Translation panel in the reader | **Anki vocabulary cards** through AnkiConnect |
-| API key | Required by most services | **Not required** for the five public dictionary sources |
+| API key | Required by most services | **Not required** for the six public dictionary sources |
 | Purpose | Understand **this passage** | Remember **this word** |
 
 Both plugins append their own panels to Zotero's selection popup through the official `Zotero.Reader` event, `renderTextSelectionPopup`. They can be enabled together: one displays translations, while the other displays dictionary definitions and the ➕ Anki button.
@@ -32,7 +32,7 @@ Both plugins append their own panels to Zotero's selection popup through the off
 
 | Feature | Description |
 |---|---|
-| **Multiple dictionary sources** | Youdao (including licensed Collins English–Chinese data), the Collins English–Chinese website, Oxford Advanced Learner's Dictionary, Bing (English–Chinese), and Cambridge. Enable or disable sources and drag to reorder them. The popup fully displays only the first two successful sources to keep it compact. |
+| **Multiple dictionary sources** | Youdao (including licensed Collins English–Chinese data), Weblio (English–Japanese), the Collins English–Chinese website, Oxford Advanced Learner's Dictionary, Bing (English–Chinese), and Cambridge. Enable or disable sources and drag to reorder them. The popup fully displays only the first two successful sources to keep it compact. |
 | **English words and phrases only** | Uses Pick2anki's selection checks: Chinese text, paragraphs, and selections exceeding five words or 60 characters do not trigger lookups. |
 | **One-click Anki cards** | Connects directly to local Anki through AnkiConnect, normally at `127.0.0.1:8765`. Saves to the chosen deck and note type, with button feedback for saving, success (✔), or an existing note (↺). |
 | **Nine configurable field sources** | Map word/phrase, context, phonetics, single definition, all definitions, examples, extras, audio, and source information to fields in your note type. Blank mappings are omitted; multiple sources mapped to one field are merged. |
@@ -121,7 +121,7 @@ At the top of Pick2anki's settings, choose English, 日本語, 简体中文, or 
 
 Under Settings → Pick2anki → Online dictionary lookup, drag sources to reorder them, use the switches to disable sources, and click **Test lookup: hello** to check connectivity.
 
-> Collins, Oxford, and Cambridge may change their websites or block requests (including HTTP 403 responses observed in testing). Failed sources are skipped. The upstream documentation reports Youdao and Bing as the most reliable sources.
+> Weblio, Collins, Oxford, and Cambridge may change their websites or block requests (including HTTP 403 responses observed in testing). Failed sources are skipped. The upstream documentation reports Youdao and Bing as the most reliable sources.
 
 ### 2. Save to Anki
 
@@ -163,7 +163,7 @@ Shared settings use the same keys as the Obsidian version of Pick2anki:
 | Card label language | `cardLabelLanguage` | `ui` | Selectable below the interface language. Uses the UI language for Pick2anki-authored card labels, or a fixed supported language. Dictionary and bibliographic content is preserved. |
 | Trigger mode | `triggerMode` | `direct` | `direct`: query on selection; `ctrl`: click Look up in the popup. |
 | Trigger delay | `triggerDebounce` | `500` | Reserved for compatibility with the Obsidian schema; Zotero uses selection events and does not need debouncing. |
-| Dictionary sources and order | `onlineDictSources` | Youdao → Bing → Cambridge → Collins → Oxford | Enable/disable and drag to reorder. |
+| Dictionary sources and order | `onlineDictSources` | Youdao → Weblio → Bing → Cambridge → Collins → Oxford | Enable/disable and drag to reorder. |
 | Enable Anki saving | `ankiEnabled` | `false` | Enables saving cards. |
 | Local bridge URL | `ankiConnectUrl` | `http://127.0.0.1:8765` | AnkiConnect endpoint. |
 | Target deck / note type | `ankiDeck` / `ankiNoteType` | Empty | Select after loading from Anki. |
@@ -195,7 +195,7 @@ Matching setting keys allow migration of dictionary order and enabled sources, A
 
 1. **Edge TTS is best effort in Zotero.** Browser WebSockets cannot customize `Cookie`, `Origin`, or `User-Agent` headers, while the Edge TTS endpoint requires a MUID cookie. The plugin injects MUID through the cookie service (`ensureMuidCookie` in [`src/modules/edge-tts.ts`](src/modules/edge-tts.ts)), but the service may still reject requests without the expected Origin. The fallback chain is **dictionary MP3 → Youdao pronunciation (HTTP, 8-second timeout) → optional Edge TTS (disabled by default)**, implemented by `storeAudio` in [`anki.ts`](src/modules/anki.ts). If all fail, only the audio field is omitted; the card can still be saved.
 2. **Sentence expansion uses heuristics.** PDF text layers vary with layout. The extracted sentence must contain the target word and have a reasonable length; otherwise the plugin falls back to **the selected text**. EPUB DOM structures vary more, so fallback is more likely. Sentence expansion can be disabled.
-3. **Dictionary sites may block scraping.** Collins, Oxford, and Cambridge may change their markup or return HTTP 403. Failure affects only that source.
+3. **Dictionary sites may block scraping.** Weblio, Collins, Oxford, and Cambridge may change their markup or return HTTP 403. Failure affects only that source.
 4. **Only English words and phrases are supported.** Chinese text, paragraphs, and selections longer than five words or 60 characters do not trigger lookup, matching the Obsidian version.
 5. **Zotero 7 or later is required**, with the manifest declaring `strict_min_version: 7.0` and `strict_max_version: 10.9.9`. Versions outside that range may reject the plugin as incompatible.
 6. **Update manifest and releases.** The configured `update_url` is `https://github.com/anemone-coronaria/zotero-pick2anki/releases/download/release/update.json`. If `update.json` is not published there, update checks return 404 without affecting normal use. See [Releases](#releases) for the publishing workflow.
@@ -205,7 +205,7 @@ Matching setting keys allow migration of dictionary order and enabled sources, A
 
 Zotero plugins have full access to the local machine. This plugin's network behavior is described below:
 
-- **Dictionary lookups:** ordinary HTTPS requests to Youdao, Bing, Cambridge, Oxford, and Collins to read entries or APIs. Pronunciation MP3s are downloaded from their audio CDNs. Requests use a common browser User-Agent and do not include publication contents or account credentials.
+- **Dictionary lookups:** ordinary HTTPS requests to Youdao, Weblio, Bing, Cambridge, Oxford, and Collins to read entries or APIs. Pronunciation MP3s are downloaded from their audio CDNs. Requests use a common browser User-Agent and do not include publication contents or account credentials.
 - **Saving cards:** connects to local AnkiConnect at `127.0.0.1:8765` by default, without a third-party intermediary. Selected words, context sentences, and definitions are written to local Anki when saving is requested, including when automatic saving is enabled.
 - **Data collection:** no accounts, API keys, telemetry, or analytics. The plugin does not collect or upload your library, annotations, or reading activity.
 - **Update checks:** Zotero periodically requests `update.json` from the release URL configured in the manifest. Automatic plugin updates can be disabled in Zotero preferences.
@@ -215,8 +215,8 @@ Zotero plugins have full access to the local machine. This plugin's network beha
 
 MIT; see [`LICENSE`](LICENSE). This project is derived from the MIT-licensed Obsidian plugin **Pick2anki**. Its original license is preserved in [`LICENSE-Pick2anki`](LICENSE-Pick2anki).
 
-- **[Pick2anki](https://github.com/soyami/pick2anki)** — MIT © soyami. The dictionary adapters, shared dictionary schema, AnkiConnect client, Anki field HTML generation, Edge TTS protocol implementation, popup design, and settings UI were ported from this project. It is the foundation of this plugin.
+- **[Pick2anki](https://github.com/soyami/pick2anki)** — MIT © soyami. The original five dictionary adapters, shared dictionary schema, AnkiConnect client, Anki field HTML generation, Edge TTS protocol implementation, popup design, and settings UI were ported from this project. The Weblio adapter was added for this Zotero plugin. Pick2anki is the foundation of this plugin.
 - **[zotero-plugin-template](https://github.com/windingwind/zotero-plugin-template)** — AGPL-3.0-or-later. This project follows its organization and zotero-plugin-scaffold configuration style, plus the manifest/bootstrap skeleton originating from Zotero's official [Make It Red](https://github.com/zotero/make-it-red) example and [Zotero 7 developer documentation](https://www.zotero.org/support/dev/zotero_7_for_developers). The project states that no business logic was copied.
 - **[zotero-pdf-translate](https://github.com/windingwind/zotero-pdf-translate)** — AGPL-3.0-or-later. Referenced for architectural ideas only, with no copied code according to this project. The plugins complement one another; see [Relationship with zotero-pdf-translate](#relationship-with-zotero-pdf-translate).
 - **[AnkiConnect](https://foosoft.net/projects/anki-connect/)** — the local JSON-RPC bridge used to save cards in Anki.
-- Dictionary data belongs to its respective providers (Youdao, Collins, Oxford, Bing, and Cambridge). The plugin parses entries for personal study; please observe each provider's terms.
+- Dictionary data belongs to its respective providers (Youdao, Weblio, Collins, Oxford, Bing, and Cambridge). The plugin parses entries for personal study; please observe each provider's terms.

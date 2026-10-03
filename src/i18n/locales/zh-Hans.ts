@@ -24,6 +24,7 @@ export const zhHans: Messages = {
   dictionaries: {
     names: {
       youdao: "有道词典（含柯林斯英汉双解）",
+      weblio: "Weblio 词典（英日）",
       collins: "柯林斯英汉词典",
       oxford: "牛津高阶学习词典",
       bing: "必应词典（英汉）",

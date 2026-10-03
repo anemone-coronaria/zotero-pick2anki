@@ -1,7 +1,7 @@
 // ============ 词典解析共享工具（各 adapter 通用，全部按 unknown 防御访问） ============
 // 【移植说明】原文件在此处 `import { requestUrl } from "obsidian"` 并直接实现 fetchText。
 // Zotero 插件没有 requestUrl：网络能力抽到 http.ts（Zotero.HTTP），这里改为转发导出，
-// 因此 5 个词典适配器的 import 语句与解析逻辑保持一字未改。
+// 因此前 5 个词典适配器的 import 语句与解析逻辑保持一字未改；Weblio 为 Zotero 版新增。
 import { getDOMParser } from "./env";
 import type { Messages } from "../i18n";
 
