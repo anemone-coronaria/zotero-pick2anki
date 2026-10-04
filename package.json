@@ -1,7 +1,7 @@
 {
   "name": "zotero-pick2anki",
   "type": "module",
-  "version": "1.0.6",
+  "version": "1.0.7",
   "description": "A Zotero dictionary plugin that looks up selected English words and saves contextual vocabulary cards to Anki.",
   "config": {
     "addonName": "Pick2anki",
