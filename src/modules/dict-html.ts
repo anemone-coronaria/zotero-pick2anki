@@ -1,5 +1,6 @@
-// ============ Anki 字段 HTML 生成（内联样式，与弹窗 demo.css 风格一致） ============
-// Anki 笔记字段本质是 HTML：为不依赖用户模板 CSS，全部使用内联 style。
+// ============ Anki 字段 HTML 生成（仅内联布局，不指定前景色） ============
+// Anki 笔记字段本质是 HTML：布局使用内联 style，但文字颜色继承卡片模板，
+// 以便浅色、深色以及用户自定义主题都保持可读。
 // 设计：和查词弹窗一致 —— 每条释义自带与之对应的例句（一个释义一组例句），
 // 因此“例句”无需单独映射字段；释义字段即已包含例句。
 import type { DictDefinition, DictLookupBundle, DictResult } from "./dict-types";
@@ -33,10 +34,10 @@ export function hlHtml(word: string, text: string): string {
 }
 
 const POS_BADGE = "display:inline-block;margin-right:5px;padding:0 5px;font-size:.9em;"
-  + "text-transform:lowercase;color:#fff;background-color:#0d47a1;border-radius:3px;";
+  + "font-weight:600;text-transform:lowercase;border:1px solid currentColor;border-radius:3px;";
 const DEF_ROW = "margin:3px 0;line-height:1.5;";
-const SRC_TITLE = "font-weight:600;color:#0d47a1;margin:4px 0 2px;";
-const NUMS = "color:#0d47a1;margin-right:4px;";
+const SRC_TITLE = "font-weight:600;margin:4px 0 2px;";
+const NUMS = "margin-right:4px;";
 const SENTS_UL = "margin:3px 0 6px;padding:4px 9px;list-style:square inside;"
   + "background:rgba(13,71,161,0.1);border-radius:5px;font-size:.93em;";
 
@@ -49,12 +50,12 @@ function defBody(def: DictDefinition, word: string): string {
     if (meaning && !/[\u3040-\u30ff\u3400-\u9fff]/.test(meaning)) {
       content += `<span>${hlHtml(word, meaning)}</span>`;
     } else if (meaning) {
-      content += `<span style="color:#0d47a1">${escHtml(meaning)}</span>`;
+      content += `<span>${escHtml(meaning)}</span>`;
     }
-    content += `<span style="color:#0d47a1">${escHtml(zh)}</span>`;
+    content += `<span>${escHtml(zh)}</span>`;
   } else if (meaning) {
     content += /[\u3040-\u30ff\u3400-\u9fff]/.test(meaning)
-      ? `<span style="color:#0d47a1">${escHtml(meaning)}</span>`
+      ? `<span>${escHtml(meaning)}</span>`
       : `<span>${hlHtml(word, meaning)}</span>`;
   }
   const badge = def.pos
@@ -63,7 +64,7 @@ function defBody(def: DictDefinition, word: string): string {
   return badge + content;
 }
 
-/** 一组例句 → 浅蓝列表（英文加粗命中词 + 中文蓝），无例句返回 "" */
+/** 一组例句 → 带底纹列表（英文加粗命中词，文字颜色继承卡片模板），无例句返回 "" */
 function sentencesHtml(pairs: Array<{ en?: string; zh?: string }>, word: string): string {
   const items: string[] = [];
   for (const p of pairs) {
@@ -71,7 +72,7 @@ function sentencesHtml(pairs: Array<{ en?: string; zh?: string }>, word: string)
     const zh = (p.zh || "").trim();
     if (!en && !zh) continue;
     const eng = en ? `<span style="margin-right:4px;">${hlHtml(word, en)}</span>` : "";
-    const chn = zh ? `<span style="color:#0d47a1">${escHtml(zh)}</span>` : "";
+    const chn = zh ? `<span>${escHtml(zh)}</span>` : "";
     items.push(`<li style="margin:2px 0;padding:0;">${eng}${chn}</li>`);
   }
   return items.length ? `<ul style="${SENTS_UL}">${items.join("")}</ul>` : "";
@@ -94,7 +95,7 @@ function extraExamplesHtml(r: DictResult, word: string, messages: Messages): str
   const rest = (r.examples || []).filter((ex) => !ex.en || !used.has(ex.en.trim().toLowerCase()));
   if (rest.length === 0) return "";
   const list = sentencesHtml(rest, word);
-  return `<div style="font-size:.85em;color:#888;margin:2px 0;">${escHtml(messages.card.moreExamples)}</div>${list}`;
+  return `<div style="font-size:.85em;margin:2px 0;">${escHtml(messages.card.moreExamples)}</div>${list}`;
 }
 
 /** 单一释义（首个可用源的第一条）+ 该义项的例句 */
@@ -143,7 +144,7 @@ export function examplesHtml(bundle: DictLookupBundle, limit = 10): string {
       seen.add(key);
     }
     const eng = en0 ? `<span style="margin-right:4px;">${hlHtml(word, en0)}</span>` : "";
-    const chn = zh0 ? `<span style="color:#0d47a1">${escHtml(zh0)}</span>` : "";
+    const chn = zh0 ? `<span>${escHtml(zh0)}</span>` : "";
     if (eng || chn) items.push(`<li style="margin:2px 0;padding:0;">${eng}${chn}</li>`);
   };
   for (const s of bundle.sources) {
@@ -172,7 +173,7 @@ export function extrasHtml(bundle: DictLookupBundle, limit = 6, messages: Messag
     for (const e of s.result.extras) {
       if (!e || seen.has(e.slice(0, 30))) continue;
       seen.add(e.slice(0, 30));
-      lines.push(`<div style="color:#666;font-size:.92em;margin:1px 0;">${escHtml(localizeExtraText(e, messages))}</div>`);
+      lines.push(`<div style="font-size:.92em;margin:1px 0;">${escHtml(localizeExtraText(e, messages))}</div>`);
       if (lines.length >= limit) return lines.join("");
     }
   }

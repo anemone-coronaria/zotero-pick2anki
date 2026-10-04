@@ -3,7 +3,7 @@ import { JSDOM } from "jsdom";
 import {
   formatList, getMessages, getMessagesForLocale, resolveLocale, SUPPORTED_LOCALES,
 } from "../src/i18n/index";
-import { allDefsHtml } from "../src/modules/dict-html";
+import { allDefsHtml, examplesHtml, extrasHtml, singleDefHtml } from "../src/modules/dict-html";
 import type { DictLookupBundle } from "../src/modules/dict-types";
 import { localizeExtraText } from "../src/modules/dict-utils";
 import { renderPrefsPane } from "../src/modules/prefs-ui";
@@ -72,7 +72,15 @@ const bundle: DictLookupBundle = {
       ok: true,
       result: {
         word: "sample",
-        definitions: [{ meaning: sourceContent }],
+        definitions: [{
+          pos: "noun",
+          meaning: sourceContent,
+          zh: "日本語の意味",
+          example: "A sample sentence.",
+          exampleZh: "例文です。",
+        }],
+        examples: [{ en: "Another sample.", zh: "別の例文。" }],
+        extras: ["音節: sam・ple"],
         source: "internal-name",
       },
     },
@@ -96,6 +104,14 @@ assert.ok(japaneseCard.includes("Meaning &lt;script&gt;alert(1)&lt;/script&gt; &
 assert.ok(!englishCard.includes("<script>"));
 assert.ok(englishCard.includes("Youdao Dictionary"));
 assert.ok(japaneseCard.includes("有道辞書"));
+const transferredDictionaryHtml = [
+  singleDefHtml(bundle),
+  englishCard,
+  examplesHtml(bundle),
+  extrasHtml(bundle, 6, getMessages("en")),
+].join("");
+assert.doesNotMatch(transferredDictionaryHtml, /(?:style=["'][^"']*|;)color\s*:/i);
+assert.ok(transferredDictionaryHtml.includes("border:1px solid currentColor"));
 
 const parserDom = new JSDOM("");
 (globalThis as unknown as { DOMParser: unknown }).DOMParser = parserDom.window.DOMParser;

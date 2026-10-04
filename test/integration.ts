@@ -263,7 +263,7 @@ async function main(): Promise<void> {
     info(`${name}：${html ? html.replace(/\s+/g, " ").slice(0, 110) + "…" : "（该词无可写内容）"}`);
   }
   const DEF_ROW = "line-height:1.5";
-  const POS_BADGE = "background-color:#0d47a1";
+  const POS_BADGE = "border:1px solid currentColor";
   const SENTS_UL = "list-style:square inside";
   check("单一释义 HTML（释义行 + 词性徽章，内联样式）",
     htmlChecks[0][1].includes(DEF_ROW) && htmlChecks[0][1].includes(POS_BADGE));
@@ -271,7 +271,7 @@ async function main(): Promise<void> {
     htmlChecks[1][1].includes(DEF_ROW) && /有道词典|Weblio|柯林斯|牛津|必应|剑桥/.test(htmlChecks[1][1]));
   check("全部释义把命中词加粗（<b>hello</b>）", /<b>hello<\/b>/i.test(htmlChecks[1][1]));
   check("例句 HTML（浅蓝方块列表）", htmlChecks[2][1] === "" || htmlChecks[2][1].includes(SENTS_UL));
-  check("额外信息 HTML（词形/搭配）", htmlChecks[3][1] === "" || htmlChecks[3][1].includes("color:#666"),
+  check("额外信息 HTML（词形/搭配）", htmlChecks[3][1] === "" || htmlChecks[3][1].includes("font-size:.92em"),
     htmlChecks[3][1] ? "" : "该词无附加信息");
   check("字段内容已转义（词条含 & 时不产生裸标签）",
     !singleDefHtml({ word: "a&b", sources: [{ id: "youdao", name: "x", url: "u", ok: true, result: { word: "a&b", definitions: [{ meaning: "<script>x</script>", zh: "&" }], source: "x" } }] }).includes("<script"));
@@ -490,12 +490,12 @@ async function main(): Promise<void> {
       fieldVal("context").includes("She said hello") && fieldVal("context").includes("自测文献标题"));
     check("③ 音标字段写入", /\/[^/]+\//.test(fieldVal("phonetic")), fieldVal("phonetic"));
     check("④ 单一释义字段（释义行 + 词性徽章）",
-      fieldVal("def_single").includes("line-height:1.5") && fieldVal("def_single").includes("background-color:#0d47a1"));
+      fieldVal("def_single").includes("line-height:1.5") && fieldVal("def_single").includes("border:1px solid currentColor"));
     check("⑤ 全部释义字段（多源 + 加粗命中词）",
       fieldVal("def_all").includes("line-height:1.5") && /<b>hello<\/b>/i.test(fieldVal("def_all")));
     check("⑥ 例句字段（内嵌例句列表）", fieldVal("examples") === "" || fieldVal("examples").includes("list-style:square inside"),
       fieldVal("examples") ? "" : "该词各源均无独立例句字段内容");
-    check("⑦ 额外信息字段", fieldVal("extra") === "" || fieldVal("extra").includes("color:#666"),
+    check("⑦ 额外信息字段", fieldVal("extra") === "" || fieldVal("extra").includes("font-size:.92em"),
       fieldVal("extra") ? "" : "该词无词形/搭配等附加信息");
     check("⑧ 音频字段（[sound:…] 已存入媒体库）", /\[sound:[^\]]+\.mp3\]/.test(fieldVal("audio")), fieldVal("audio"));
     check("⑨ 来源字段：词典链接 + zotero:// 条目链接 + 条目信息",
