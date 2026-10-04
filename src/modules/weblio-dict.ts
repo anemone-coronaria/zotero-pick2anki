@@ -47,13 +47,61 @@ function exampleAfter(block: Element): DictExample | null {
   return null;
 }
 
+function visibleText(node: Element): string {
+  const innerText = (node as HTMLElement).innerText;
+  return clean(typeof innerText === "string" ? innerText : node.textContent);
+}
+
+/**
+ * Preserve the overview information exposed by Weblio's summary tables. This
+ * covers the same sections consumed by zotero-pdf-translate's Weblio service,
+ * while keeping definitions, pronunciation, and metadata in separate fields.
+ */
+function overviewExtras(doc: Document): string[] {
+  const extras: string[] = [];
+  const seen = new Set<string>();
+  const add = (value: string): void => {
+    const line = clean(value);
+    if (!line || seen.has(line)) return;
+    seen.add(line);
+    extras.push(line);
+  };
+  const childLine = (node: Element): string => Array.from(node.children)
+    .map(visibleText)
+    .filter(Boolean)
+    .join(": ");
+
+  for (const summary of Array.from(doc.querySelectorAll(".summaryM:not(.descriptionWrp)"))) {
+    for (const child of Array.from(summary.children)) {
+      const line = childLine(child);
+      // Pronunciation has its own structured field below; retain the syllable
+      // and any other Weblio summary metadata without duplicating phonetics.
+      if (line && !/発音記号|読み方/.test(line)) add(line);
+    }
+  }
+  for (const table of Array.from(doc.querySelectorAll(".intrst"))) {
+    const row = table.querySelector("tr");
+    if (row) add(childLine(row));
+  }
+  return extras;
+}
+
 export function parseWeblioHtml(word: string, html: string): DictResult | null {
   const doc = parseHtml(html);
-  const summary = clean(doc.querySelector("#summary .content-explanation.ej")?.textContent);
+  const summary = clean(doc.querySelector(
+    ".descriptionWrp .content-explanation.ej, #summary .content-explanation.ej",
+  )?.textContent);
   const definitions: DictDefinition[] = [];
   const seenDefinitions = new Set<string>();
   let currentPos: string | undefined;
   const detail = doc.querySelector("#hideDictPrsKENEJ .Kejje, .Kejje");
+
+  // Weblio's summary is the first translation line in zotero-pdf-translate.
+  // Keep it first here too, followed by the more detailed sense breakdown.
+  if (summary) {
+    definitions.push({ meaning: summary });
+    seenDefinitions.add(summary);
+  }
 
   if (detail) {
     for (const block of Array.from(detail.querySelectorAll(":scope > .level0"))) {
@@ -74,7 +122,6 @@ export function parseWeblioHtml(word: string, html: string): DictResult | null {
     }
   }
 
-  if (definitions.length === 0 && summary) definitions.push({ meaning: summary });
   if (definitions.length === 0) return null;
 
   let uk = "";
@@ -112,6 +159,7 @@ export function parseWeblioHtml(word: string, html: string): DictResult | null {
     audioUrl,
     definitions,
     examples,
+    extras: overviewExtras(doc),
     source: ONLINE_DICT_NAMES.weblio,
     sourceUrl: entryUrl(word),
   };

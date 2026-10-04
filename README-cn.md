@@ -217,6 +217,6 @@ MIT（[`LICENSE`](LICENSE) 为标准 MIT 正文）。本项目是 MIT 许可的 
 
 - **[Pick2anki](https://github.com/soyami/pick2anki)** — MIT © soyami。本项目原有的五个词典适配器（有道/柯林斯/牛津/必应/剑桥）、统一词典 schema、AnkiConnect 客户端、Anki 字段 HTML 生成、Edge TTS 协议实现、弹窗与设置页设计均移植自它；Weblio 适配器由本 Zotero 插件新增。**没有它就沒有本项目**。
 - **[zotero-plugin-template](https://github.com/windingwind/zotero-plugin-template)** — AGPL-3.0-or-later。本项目沿用了它的项目组织结构、`zotero-plugin.config.ts` 构建配置写法（`zotero-plugin-scaffold`）与 `addon/manifest.json` / `bootstrap.js` 骨架（该骨架本身来自 Zotero 官方的 [Make It Red](https://github.com/zotero/make-it-red) 示例与 [Zotero 7 开发文档](https://www.zotero.org/support/dev/zotero_7_for_developers)），未复制其中的业务代码。
-- **[zotero-pdf-translate](https://github.com/windingwind/zotero-pdf-translate)** — AGPL-3.0-or-later。仅参考其公开的架构思路（在 Zotero 官方划词弹窗里追加自己的面板、给面板内控件做事件隔离），**未复制任何代码**；两者的定位互补，详见[上文对比表](#与-zotero-pdf-translate-的关系互补可共存)。
+- **[zotero-pdf-translate](https://github.com/windingwind/zotero-pdf-translate)** — AGPL-3.0-or-later。参考其公开的架构思路（在 Zotero 官方划词弹窗里追加自己的面板、给面板内控件做事件隔离）以及 Weblio 结果应覆盖的栏目，**未复制任何代码**；两者的定位互补，详见[上文对比表](#与-zotero-pdf-translate-的关系互补可共存)。
 - **[AnkiConnect](https://foosoft.net/projects/anki-connect/)** — Anki 的本地 JSON-RPC 桥，写卡的传输层。
 - 词典数据版权归各来源网站所有（有道、Weblio、柯林斯、牛津、必应、剑桥），本插件仅做个人学习用途的页面解析，请遵守各站条款。

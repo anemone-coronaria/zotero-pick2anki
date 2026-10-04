@@ -101,10 +101,20 @@ const parserDom = new JSDOM("");
 (globalThis as unknown as { DOMParser: unknown }).DOMParser = parserDom.window.DOMParser;
 const weblioResult = parseWeblioHtml("hello", `
   <div id="summary">
-    <span class="content-explanation ej">こんにちは、もしもし</span>
+    <div class="summaryM descriptionWrp"><p>
+      <span class="description">意味・対訳</span>
+      <span class="content-explanation ej">こんにちは、もしもし</span>
+    </p></div>
+    <div class="summaryM">
+      <span class="element-block"><b>音節</b><span>hel・lo</span></span>
+      <span class="element-block"><b>発音記号・読み方</b><span>/həlóʊ, həlˈəʊ/</span></span>
+    </div>
     <span class="phoneticEjjeDesc">həlóʊ</span><span>（米国英語）</span>
     <span class="phoneticEjjeDesc">həlˈəʊ</span><span>（英国英語）</span>
     <audio class="contentAudio"><source src="https://cdn.example.test/hello.mp3"></audio>
+    <table class="intrst"><tr><td>helloの品詞ごとの意味や使い方</td><td>間投詞としての意味・使い方</td></tr></table>
+    <table class="intrst"><tr><td>helloのイディオムやフレーズ</td><td>say hello to</td></tr></table>
+    <table class="intrst"><tr><td>helloの学習レベル</td><td>レベル：2</td></tr></table>
   </div>
   <div id="hideDictPrsKENEJ"><div class="Kejje">
     <div class="level0"><div class="KnenjSub">間投詞</div></div>
@@ -115,12 +125,19 @@ const weblioResult = parseWeblioHtml("hello", `
   </div></div>
 `);
 assert.ok(weblioResult);
-assert.equal(weblioResult.definitions[0].pos, "interjection");
-assert.equal(weblioResult.definitions[0].meaning, "やあ、こんにちは");
-assert.equal(weblioResult.definitions[0].example, "Hello there!");
-assert.equal(weblioResult.definitions[0].exampleZh, "こんにちは！");
+assert.equal(weblioResult.definitions[0].meaning, "こんにちは、もしもし");
+assert.equal(weblioResult.definitions[1].pos, "interjection");
+assert.equal(weblioResult.definitions[1].meaning, "やあ、こんにちは");
+assert.equal(weblioResult.definitions[1].example, "Hello there!");
+assert.equal(weblioResult.definitions[1].exampleZh, "こんにちは！");
 assert.match(weblioResult.phonetic || "", /UK.*həlˈəʊ.*US.*həlóʊ/);
 assert.equal(weblioResult.audioUrl, "https://cdn.example.test/hello.mp3");
+assert.deepEqual(weblioResult.extras, [
+  "音節: hel・lo",
+  "helloの品詞ごとの意味や使い方: 間投詞としての意味・使い方",
+  "helloのイディオムやフレーズ: say hello to",
+  "helloの学習レベル: レベル：2",
+]);
 
 const prefs = new Map<string, unknown>();
 (globalThis as unknown as { Zotero: unknown }).Zotero = {

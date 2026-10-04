@@ -121,7 +121,7 @@ export function renderBundleInto(
       addSentenceList(doc, section, rest, r.word);
     }
     // 附加信息（词形/搭配等）
-    for (const extra of (r.extras || []).slice(0, 3)) {
+    for (const extra of (r.extras || []).slice(0, 6)) {
       section.appendChild(div(doc, "p2a-extra", localizeExtraText(extra, messages)));
     }
     container.appendChild(section);
